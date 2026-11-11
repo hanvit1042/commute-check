@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f3a5f">
 <title>출퇴근 교통 확인</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161d;--card:#18212b;--fg:#eaf0f6;--sub:#9aa7b4;--line:#2a3643;--main:#5d8fcf;--onmain:#0b1219;--ok:#6fd195;--okbg:#14301f;--warn:#f0b24c;--warnbg:#33260d;--bad:#ff8d85;--badbg:#3a1613}}
@@ -33,6 +34,10 @@ h2{font-size:18px;margin:0 0 8px}
 .muted{color:var(--sub);font-size:15px}
 input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
 details summary{cursor:pointer;color:var(--sub);font-size:15px;min-height:36px}
+#map{height:62vh;min-height:320px;border-radius:14px;border:1px solid var(--line);margin-top:16px;z-index:0}
+.legend{font-size:14px;color:var(--sub);margin:8px 2px 0}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin:0 4px 0 10px}
+.dot:first-child{margin-left:0}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -58,6 +63,7 @@ details summary{cursor:pointer;color:var(--sub);font-size:15px;min-height:36px}
 </section>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 // 지도 조회 범위: 인천 연수구 ~ 서울 강서구
 var BOX = {minX:126.62, maxX:126.95, minY:37.38, maxY:37.58};
@@ -92,6 +98,26 @@ async function call(path, params, key){
     if(j.header&&j.header.resultCode!==0){throw new Error(j.header.resultMsg||'조회 실패')}
     return (j.body&&j.body.items)||[];
   }finally{clearTimeout(t)}
+}
+
+var MAP=null;
+function drawMap(events,mine){
+  var box=$('map');
+  if(!box)return;
+  if(typeof L==='undefined'){box.outerHTML='<div class="card muted">지도를 불러오지 못했습니다</div>';return}
+  if(MAP){MAP.remove();MAP=null}
+  MAP=L.map('map').fitBounds([[BOX.minY,BOX.minX],[BOX.maxY,BOX.maxX]]);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(MAP);
+  var set=new Set(mine);
+  var list=events.slice().sort(function(a,b){return (set.has(a)?1:0)-(set.has(b)?1:0)});
+  list.forEach(function(e){
+    var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
+    if(isNaN(x)||isNaN(y))return;
+    var my=set.has(e),acc=e.eventType==='교통사고';
+    L.circleMarker([y,x],{radius:my?12:5,color:my?'#ffffff':'#777777',weight:my?3:1,fillColor:acc?'#d93025':(my?'#f29900':'#9aa0a6'),fillOpacity:my?0.95:0.6})
+      .bindPopup('<b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b><br>'+esc(e.message||e.eventDetailType||'')+'<br>'+hhmm(e.startDate)+' 발생')
+      .addTo(MAP);
+  });
 }
 
 function state(avg,hw){var a=hw?[60,40]:[30,20];return avg>=a[0]?['원활','c-ok',0]:avg>=a[1]?['서행','c-warn',1]:['정체','c-bad',2]}
@@ -139,6 +165,7 @@ async function run(which){
     if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
     var h='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
     if(level===2)h+='<div class="card"><b>'+esc(R.alt)+'</b></div>';
+    h+='<div id="map"></div><p class="legend"><span class="dot" style="background:#d93025"></span>사고<span class="dot" style="background:#f29900"></span>공사·기타<span class="dot" style="background:#9aa0a6"></span>내 도로 아님 (큰 핀이 내 도로)</p>';
 
     h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">소통 자료가 없습니다</span>')+(none.length?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
 
@@ -150,6 +177,7 @@ async function run(which){
     h+='</div>';
     h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건</p>';
     out.innerHTML=h;
+    drawMap(events,mine);
   }catch(err){
     var m=String(err&&err.message||err);
     out.innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "인증키 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
