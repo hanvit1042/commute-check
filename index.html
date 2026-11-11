@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<title>출퇴근 교통 확인</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161d;--card:#18212b;--fg:#eaf0f6;--sub:#9aa7b4;--line:#2a3643;--main:#5d8fcf;--onmain:#0b1219;--ok:#6fd195;--okbg:#14301f;--warn:#f0b24c;--warnbg:#33260d;--bad:#ff8d85;--badbg:#3a1613}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:18px/1.6 -apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;padding:16px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:0 auto}
+h1{font-size:24px;margin:8px 0 4px}
+.sub{color:var(--sub);font-size:15px;margin:0 0 20px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{font:inherit;font-weight:700;border:0;border-radius:14px;min-height:68px;background:var(--main);color:var(--onmain);cursor:pointer}
+button:disabled{opacity:.55}
+button.ghost{background:transparent;color:var(--sub);border:1px solid var(--line);min-height:44px;font-weight:500;font-size:15px;padding:0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+.banner{border-radius:14px;padding:16px;margin-top:16px;font-weight:700;font-size:20px}
+.banner small{display:block;font-weight:400;font-size:15px;margin-top:2px}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}
+h2{font-size:18px;margin:0 0 8px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.row:first-of-type{border-top:0}
+.row>span:first-child{min-width:0;overflow-wrap:anywhere}
+.chip{white-space:nowrap;font-weight:700;border-radius:999px;padding:0 12px;font-size:15px;align-self:flex-start}
+.c-ok{background:var(--okbg);color:var(--ok)}.c-warn{background:var(--warnbg);color:var(--warn)}.c-bad{background:var(--badbg);color:var(--bad)}
+.ev{padding:10px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.ev:first-of-type{border-top:0}
+.ev b{display:block}.ev span{color:var(--sub);font-size:15px}
+.muted{color:var(--sub);font-size:15px}
+input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
+details summary{cursor:pointer;color:var(--sub);font-size:15px;min-height:36px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>출퇴근 교통 확인</h1>
+<p class="sub">버튼을 누르면 지금 내 경로의 사고·공사·정체를 확인합니다.</p>
+
+<section id="setup" class="card" hidden>
+  <h2>인증키 입력 (처음 한 번)</h2>
+  <p class="muted">국가교통정보센터(ITS) 인증키를 입력하면 이 폰에만 저장됩니다.</p>
+  <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
+  <button id="saveKey" style="width:100%">저장</button>
+</section>
+
+<section id="main" hidden>
+  <div class="btns">
+    <button id="go">출근 확인<br><small style="font-weight:400;font-size:14px">집 → 회사</small></button>
+    <button id="back">퇴근 확인<br><small style="font-weight:400;font-size:14px">회사 → 집</small></button>
+  </div>
+  <div id="out"></div>
+  <p style="margin-top:28px"><button class="ghost" id="resetKey">인증키 변경</button></p>
+</section>
+</main>
+
+<script>
+// 지도 조회 범위: 인천 연수구 ~ 서울 강서구
+var BOX = {minX:126.62, maxX:126.95, minY:37.38, maxY:37.58};
+var BASE = 'https://openapi.its.go.kr:9443/';
+
+// 경로별 확인 도로. ev: 사고·공사 글에서 찾을 이름, tr: 소통(속도)에서 찾을 도로명, hw: 고속도로 여부
+var ROUTES = {
+  go:   {name:'출근 · 집 → 회사', alt:'우회 후보: 경인고속도로 경유',
+         roads:[{n:'제2경인고속도로',ev:['제2경인'],tr:['제2경인'],hw:1,part:1},{n:'송내대로',ev:['송내대로'],tr:['송내대로']},{n:'봉오대로',ev:['봉오대로'],tr:['봉오대로']},{n:'오정로',ev:['오정로'],tr:['오정로']},{n:'남부순환로',ev:['남부순환'],tr:['남부순환로']}]},
+  back: {name:'퇴근 · 회사 → 집', alt:'우회 후보: 송내대로 경유',
+         roads:[{n:'남부순환로',ev:['남부순환'],tr:['남부순환로']},{n:'경인고속도로',ev:['경인고속','경인선'],tr:['경인고속도로'],hw:1},{n:'수도권제1순환',ev:['수도권제1순환','외곽순환'],tr:['수도권제1순환','서울외곽'],hw:1,part:1},{n:'제2경인고속도로',ev:['제2경인'],tr:['제2경인'],hw:1,part:1},{n:'송내대로',ev:['송내대로'],tr:['송내대로']}]}
+};
+
+var $ = function(id){return document.getElementById(id)};
+function load(){try{return localStorage.getItem('itsKey')||''}catch(e){return ''}}
+function save(v){try{localStorage.setItem('itsKey',v)}catch(e){}}
+function clear(){try{localStorage.removeItem('itsKey')}catch(e){}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+function show(){var k=load();$('setup').hidden=!!k;$('main').hidden=!k}
+$('saveKey').onclick=function(){var v=$('key').value.trim();if(v.length>=16){save(v);$('key').value='';show()}};
+$('resetKey').onclick=function(){clear();show()};
+$('go').onclick=function(){run('go')};
+$('back').onclick=function(){run('back')};
+
+async function call(path, params, key){
+  var u=BASE+path+'?apiKey='+encodeURIComponent(key)+'&'+params+'&getType=json';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},20000);
+  try{
+    var r=await fetch(u,{signal:c.signal});
+    var j=await r.json();
+    if(j.header&&j.header.resultCode!==0){throw new Error(j.header.resultMsg||'조회 실패')}
+    return (j.body&&j.body.items)||[];
+  }finally{clearTimeout(t)}
+}
+
+function state(avg,hw){var a=hw?[60,40]:[30,20];return avg>=a[0]?['원활','c-ok',0]:avg>=a[1]?['서행','c-warn',1]:['정체','c-bad',2]}
+function hhmm(s){return s&&s.length>=12?s.slice(4,6)+'/'+s.slice(6,8)+' '+s.slice(8,10)+':'+s.slice(10,12):''}
+
+async function run(which){
+  var key=load(), R=ROUTES[which], out=$('out');
+  $('go').disabled=$('back').disabled=true;
+  out.innerHTML='<div class="card muted">조회 중입니다…</div>';
+  try{
+    var box='minX='+BOX.minX+'&maxX='+BOX.maxX+'&minY='+BOX.minY+'&maxY='+BOX.maxY;
+    var res=await Promise.all([
+      call('eventInfo','type=all&eventType=all&'+box,key),
+      call('trafficInfo','type=all&drcType=all&'+box,key)
+    ]);
+    var events=res[0], traffic=res[1];
+
+    // 내 도로에 해당하는 사고·공사
+    var mine=events.filter(function(e){
+      return R.roads.some(function(r){return r.ev.some(function(k){return (e.roadName||'').indexOf(k)>-1||(e.message||'').indexOf(k)>-1})});
+    });
+    var acc=mine.filter(function(e){return e.eventType==='교통사고'});
+
+    // 도로별 평균 속도
+    var worst=0, rows=[], none=[];
+    R.roads.forEach(function(r){
+      var s=0,n=0;
+      traffic.forEach(function(t){
+        var nm=t.roadName||'', v=parseFloat(t.speed);
+        if(isNaN(v)) return;
+        var hit=r.tr.some(function(k){return r.hw?nm.indexOf(k)>-1:nm===k});
+        if(hit){s+=v;n++}
+      });
+      if(!n){none.push(r.n);return}
+      var avg=s/n, st=state(avg,r.hw);
+      if(st[2]>worst)worst=st[2];
+      rows.push('<div class="row"><span>'+esc(r.n)+(r.part?' <span class="muted">(일부 구간)</span>':'')+'<br><span class="muted">평균 '+avg.toFixed(0)+'km/h</span></span><span class="chip '+st[1]+'">'+st[0]+'</span></div>');
+    });
+
+    var level=(acc.length||worst===2)?2:(mine.length||worst===1)?1:0;
+    var cls=['b-ok','b-warn','b-bad'][level];
+    var title=['이상 없음','주의가 필요합니다','우회를 검토하세요'][level];
+    var line=acc.length?('교통사고 '+acc.length+'건'):'';
+    if(mine.length-acc.length>0){line+=(line?' · ':'')+'공사·기타 '+(mine.length-acc.length)+'건'}
+    if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
+    var h='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
+    if(level===2)h+='<div class="card"><b>'+esc(R.alt)+'</b></div>';
+
+    h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">소통 자료가 없습니다</span>')+(none.length?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
+
+    h+='<div class="card"><h2>사고·공사</h2>';
+    if(!mine.length){h+='<span class="muted">해당 없음</span>'}
+    else mine.slice(0,15).forEach(function(e){
+      h+='<div class="ev"><b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b>'+esc(e.message||e.eventDetailType||'')+(e.lanesBlocked?'<br><span>'+esc(e.lanesBlocked)+'</span>':'')+'<br><span>'+hhmm(e.startDate)+' 발생</span></div>';
+    });
+    h+='</div>';
+    h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건</p>';
+    out.innerHTML=h;
+  }catch(err){
+    var m=String(err&&err.message||err);
+    out.innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "인증키 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
+  }finally{$('go').disabled=$('back').disabled=false}
+}
+show();
+</script>
+</body>
+</html>
