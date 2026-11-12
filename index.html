@@ -87,7 +87,8 @@ var ROUTES = {
 };
 
 var $ = function(id){return document.getElementById(id)};
-function load(){try{return localStorage.getItem('itsKey')||''}catch(e){return ''}}
+var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a'};
+function load(){try{return localStorage.getItem('itsKey')||DEF.its}catch(e){return DEF.its}}
 function save(v){try{localStorage.setItem('itsKey',v)}catch(e){}}
 function clear(){try{localStorage.removeItem('itsKey')}catch(e){}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -95,7 +96,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 var EDIT=false;
 function get(n){try{return localStorage.getItem(n)||''}catch(e){return ''}}
 function put(n,v){try{localStorage.setItem(n,v)}catch(e){}}
-function show(){var open=!load()||EDIT;$('setup').hidden=!open;$('main').hidden=open}
+function show(){var open=!(get('itsHome')&&get('itsWork'))||EDIT;$('setup').hidden=!open;$('main').hidden=open}
 
 // 좌표("37.40, 126.68") 또는 구글 플러스 코드("8Q98CM5J+H5Q")를 [위도, 경도]로 바꿉니다
 function parsePos(s){
@@ -112,7 +113,7 @@ function parsePos(s){
 }
 
 $('saveKey').onclick=function(){
-  var v=$('key').value.trim()||load(), h=$('home').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey'), er=$('err');
+  var v=$('key').value.trim()||load(), h=$('home').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey')||DEF.kakao, er=$('err');
   if(v.length<16){er.textContent='인증키를 입력해 주세요.';er.hidden=false;return}
   if((h&&!parsePos(h))||(w&&!parsePos(w))){er.textContent='위치 형식을 확인해 주세요. (예: 8Q98CM5J+H5Q 또는 37.40, 126.68)';er.hidden=false;return}
   save(v);put('kakaoKey',kk);put('itsHome',h);put('itsWork',w);er.hidden=true;EDIT=false;$('key').value='';$('kakao').value='';show()
@@ -137,7 +138,7 @@ async function call(path, params, key){
 var USUAL = {go:'sn', back:'gi'};
 var KIND = {sn:'송내대로 경유', gi:'경인·제1순환 경유'};
 async function verdict(which){
-  var kk=get('kakaoKey'), H=parsePos(get('itsHome')), W=parsePos(get('itsWork'));
+  var kk=get('kakaoKey')||DEF.kakao, H=parsePos(get('itsHome')), W=parsePos(get('itsWork'));
   if(!kk||!H||!W)return '<div class="card muted">우회 판단을 쓰려면 아래 "설정 변경"에서 카카오 키와 집·회사 위치를 입력해 주세요.</div>';
   var o=which==='go'?H:W, d=which==='go'?W:H;
   var u='https://apis-navi.kakaomobility.com/v1/directions?origin='+o[1]+','+o[0]+'&destination='+d[1]+','+d[0]+'&priority=RECOMMEND&alternatives=true&road_details=false';
