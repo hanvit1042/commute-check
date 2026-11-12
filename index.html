@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f3a5f">
-<title>출퇴근 교통 확인</title>
+<title>원클릭 비서</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
@@ -39,13 +39,19 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .legend{font-size:14px;color:var(--sub);margin:8px 2px 0}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin:0 4px 0 10px}
 .dot:first-child{margin-left:0}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.menu button{min-height:88px}.menu small{display:block;font-weight:400;font-size:14px}
+.it{padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.it:first-of-type{border-top:0}
+.it b{display:block;font-size:19px}.it .m{color:var(--sub);font-size:15px}
+.lk{display:inline-block;margin:8px 8px 0 0;padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--main);font-size:15px;font-weight:700;text-decoration:none}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
-<h1>출퇴근 교통 확인</h1>
-<p class="sub">버튼을 누르면 지금 내 경로의 사고·공사·정체를 확인합니다.</p>
+<h1>원클릭 비서</h1>
+<p class="sub">버튼 한 번으로 지금 필요한 정보를 확인합니다.</p>
 
 <section id="setup" class="card" hidden>
   <h2>설정</h2>
@@ -62,7 +68,27 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
   <button id="saveKey" style="width:100%">저장</button>
 </section>
 
+<section id="home" hidden>
+  <div class="menu">
+    <button id="mGo">출근 확인<small>집 → 회사</small></button>
+    <button id="mBack">퇴근 확인<small>회사 → 집</small></button>
+    <button id="mFood">주변 맛집<small>현재 위치 기준</small></button>
+    <button id="mStay">주변 숙소<small>현재 위치 기준</small></button>
+    <button id="mPark">주변 공영주차장<small>현재 위치 기준</small></button>
+    <button disabled>주유소·관광<small>준비 중</small></button>
+  </div>
+  <p style="margin-top:28px"><button class="ghost" id="resetKey2">설정 변경</button></p>
+</section>
+
+<section id="near" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
+  <h2 id="nTitle"></h2>
+  <div id="nOut"></div>
+  <p><button class="ghost" id="nMore">범위 넓히기</button></p>
+</section>
+
 <section id="main" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
   <div class="btns">
     <button id="go">출근 확인<br><small style="font-weight:400;font-size:14px">집 → 회사</small></button>
     <button id="back">퇴근 확인<br><small style="font-weight:400;font-size:14px">회사 → 집</small></button>
@@ -96,7 +122,8 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 var EDIT=false;
 function get(n){try{return localStorage.getItem(n)||''}catch(e){return ''}}
 function put(n,v){try{localStorage.setItem(n,v)}catch(e){}}
-function show(){var open=!(get('itsHome')&&get('itsWork'))||EDIT;$('setup').hidden=!open;$('main').hidden=open}
+function view(n){['setup','home','main','near'].forEach(function(id){$(id).hidden=id!==n});window.scrollTo(0,0)}
+function show(){var open=!(get('itsHome')&&get('itsWork'))||EDIT;view(open?'setup':'home')}
 
 // 좌표("37.40, 126.68") 또는 구글 플러스 코드("8Q98CM5J+H5Q")를 [위도, 경도]로 바꿉니다
 function parsePos(s){
@@ -121,6 +148,55 @@ $('saveKey').onclick=function(){
 $('resetKey').onclick=function(){EDIT=true;$('key').value='';$('kakao').value='';$('home').value=get('itsHome');$('work').value=get('itsWork');show()};
 $('go').onclick=function(){run('go')};
 $('back').onclick=function(){run('back')};
+$('resetKey2').onclick=function(){$('resetKey').onclick()};
+document.querySelectorAll('.toHome').forEach(function(b){b.onclick=function(){view('home')}});
+$('mGo').onclick=function(){view('main');run('go')};
+$('mBack').onclick=function(){view('main');run('back')};
+$('mFood').onclick=function(){near('food',0)};
+$('mStay').onclick=function(){near('stay',0)};
+$('mPark').onclick=function(){near('park',0)};
+$('nMore').onclick=function(){near(NK,NI+1)};
+
+// 현재 위치 기준 주변 검색 (카카오 장소 검색)
+var NEAR={
+  food:{t:'주변 맛집',u:'search/category.json?category_group_code=FD6',r:[500,1000,2000]},
+  stay:{t:'주변 숙소',u:'search/category.json?category_group_code=AD5',r:[2000,5000,10000]},
+  park:{t:'주변 공영주차장',u:'search/keyword.json?query='+encodeURIComponent('공영주차장'),r:[500,1000,2000]}
+};
+var NK=null,NI=0;
+function fmt(m){return m>=1000?(m/1000)+'km':m+'m'}
+function here(){return new Promise(function(ok,no){
+  if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
+  navigator.geolocation.getCurrentPosition(function(p){ok([p.coords.latitude,p.coords.longitude])},function(){no(new Error('위치 권한을 허용해 주세요'))},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+})}
+async function near(k,i){
+  var N=NEAR[k];NK=k;NI=i;
+  view('near');
+  $('nTitle').textContent=N.t+' · 반경 '+fmt(N.r[i]);
+  $('nMore').hidden=i>=N.r.length-1;
+  $('nOut').innerHTML='<div class="card muted">현재 위치 확인 중…</div>';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},15000);
+  try{
+    var p=await here();
+    var u='https://dapi.kakao.com/v2/local/'+N.u+'&x='+p[1]+'&y='+p[0]+'&radius='+N.r[i]+'&sort=distance&size=15';
+    var r=await fetch(u,{headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)},signal:c.signal});
+    var j=await r.json();
+    if(!j.documents)throw new Error(j.message||'조회 실패');
+    var d=j.documents;
+    if(k==='park'){var g=d.filter(function(x){return x.place_name.indexOf('공영')>-1});if(g.length)d=g}
+    if(!d.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 결과가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+    var h='<div class="card">';
+    d.forEach(function(x){
+      var cat=(x.category_name||'').split(' > ').slice(1).join(' · ');
+      h+='<div class="it"><b>'+esc(x.place_name)+'</b><span class="m">'+fmt(parseInt(x.distance,10)||0)+(cat?' · '+esc(cat):'')+'</span><br><span class="m">'+esc(x.road_address_name||x.address_name||'')+(x.phone?' · '+esc(x.phone):'')+'</span><br>'
+        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.place_name)+','+x.y+','+x.x+'">길안내</a>'
+        +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.place_url||'#')+'">후기·상세</a></div>';
+    });
+    $('nOut').innerHTML=h+'</div>';
+  }catch(e){
+    $('nOut').innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.name==='AbortError'?'시간이 오래 걸립니다. 다시 눌러 주세요.':(e&&e.message||e))+'</small></div>';
+  }finally{clearTimeout(t)}
+}
 
 async function call(path, params, key, ms){
   var u=BASE+path+'?apiKey='+encodeURIComponent(key)+'&'+params+'&getType=json';
