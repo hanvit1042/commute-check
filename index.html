@@ -98,8 +98,9 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 </section>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
+window.onerror=function(m){var d=document.createElement('div');d.className='card';d.style.color='#b3261e';d.textContent='오류: '+m;document.body.appendChild(d)};
 // 지도 조회 범위: 인천 연수구 ~ 서울 강서구
 var BOX = {minX:126.62, maxX:126.95, minY:37.38, maxY:37.58};
 var BASE = 'https://openapi.its.go.kr:9443/';
