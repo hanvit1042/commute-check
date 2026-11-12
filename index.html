@@ -75,7 +75,8 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
     <button id="mFood">주변 맛집<small>현재 위치 기준</small></button>
     <button id="mStay">주변 숙소<small>현재 위치 기준</small></button>
     <button id="mPark">주변 공영주차장<small>현재 위치 기준</small></button>
-    <button disabled>주유소·관광<small>준비 중</small></button>
+    <button id="mGas">주변 주유소<small>현재 위치 기준</small></button>
+    <button id="mTour" style="grid-column:1/-1">주변 관광·역사 이야기<small>현재 위치 기준</small></button>
   </div>
   <p style="margin-top:28px"><button class="ghost" id="resetKey2">설정 변경</button></p>
 </section>
@@ -114,7 +115,7 @@ var ROUTES = {
 };
 
 var $ = function(id){return document.getElementById(id)};
-var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a'};
+var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a',tour:'03c2f4a4bbcf522b9ef4cac1c84f58bf93a18b96041017bc1380a08c7aa8b93b'};
 function load(){try{return localStorage.getItem('itsKey')||DEF.its}catch(e){return DEF.its}}
 function save(v){try{localStorage.setItem('itsKey',v)}catch(e){}}
 function clear(){try{localStorage.removeItem('itsKey')}catch(e){}}
@@ -156,15 +157,61 @@ $('mBack').onclick=function(){view('main');run('back')};
 $('mFood').onclick=function(){near('food',0)};
 $('mStay').onclick=function(){near('stay',0)};
 $('mPark').onclick=function(){near('park',0)};
-$('nMore').onclick=function(){near(NK,NI+1)};
+$('mGas').onclick=function(){near('gas',0)};
+$('mTour').onclick=function(){tour(0)};
+$('nMore').onclick=function(){if(NK==='tour')tour(NI+1);else near(NK,NI+1)};
 
 // 현재 위치 기준 주변 검색 (카카오 장소 검색)
 var NEAR={
   food:{t:'주변 맛집',u:'search/category.json?category_group_code=FD6',r:[500,1000,2000]},
   stay:{t:'주변 숙소',u:'search/category.json?category_group_code=AD5',r:[2000,5000,10000]},
-  park:{t:'주변 공영주차장',u:'search/keyword.json?query='+encodeURIComponent('공영주차장'),r:[500,1000,2000]}
+  park:{t:'주변 공영주차장',u:'search/keyword.json?query='+encodeURIComponent('공영주차장'),r:[500,1000,2000]},
+  gas:{t:'주변 주유소',u:'search/category.json?category_group_code=OL7',r:[2000,5000,10000]}
 };
 var NK=null,NI=0;
+var TR=[3000,10000,30000];
+function clean(s){return String(s||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()}
+async function tour(i){
+  NK='tour';NI=i;
+  view('near');
+  $('nTitle').textContent='주변 관광·역사 · 반경 '+fmt(TR[i]);
+  $('nMore').hidden=i>=TR.length-1;
+  $('nOut').innerHTML='<div class="card muted">현재 위치 확인 중…</div>';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},20000);
+  try{
+    var p=await here();
+    var B='https://apis.data.go.kr/B551011/KorService2/';
+    var q='serviceKey='+DEF.tour+'&MobileOS=ETC&MobileApp=oneclick&_type=json';
+    var r=await fetch(B+'locationBasedList2?'+q+'&mapX='+p[1]+'&mapY='+p[0]+'&radius='+TR[i]+'&arrange=E&numOfRows=15&contentTypeId=12',{signal:c.signal});
+    var j=await r.json();
+    var it=(j.response&&j.response.body&&j.response.body.items&&j.response.body.items.item)||[];
+    if(!it.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 관광지가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+    var h='<div class="card">';
+    it.forEach(function(x,n){
+      h+='<div class="it"><b>'+esc(x.title)+'</b><span class="m">'+fmt(Math.round(parseFloat(x.dist)||0))+' · '+esc(x.addr1||'')+'</span><br>'
+        +(x.firstimage?'<img src="'+esc(x.firstimage.replace(/^http:/,'https:'))+'" alt="" loading="lazy" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px">':'')
+        +'<br><button class="ghost" data-id="'+esc(x.contentid)+'" data-n="'+n+'" style="margin-top:8px">이야기 보기</button> '
+        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.title)+','+x.mapy+','+x.mapx+'">길안내</a>'
+        +'<div class="muted" id="st'+n+'" style="white-space:pre-line;margin-top:8px" hidden></div></div>';
+    });
+    $('nOut').innerHTML=h+'</div>';
+    $('nOut').querySelectorAll('button[data-id]').forEach(function(b){b.onclick=async function(){
+      var box=$('st'+b.getAttribute('data-n'));
+      if(!box.hidden){box.hidden=true;b.textContent='이야기 보기';return}
+      box.hidden=false;b.textContent='이야기 닫기';
+      if(box.getAttribute('data-ok'))return;
+      box.textContent='불러오는 중…';
+      try{
+        var r2=await fetch(B+'detailCommon2?'+q+'&contentId='+b.getAttribute('data-id'));
+        var j2=await r2.json();
+        box.textContent=clean(j2.response.body.items.item[0].overview)||'등록된 설명이 없습니다.';
+        box.setAttribute('data-ok','1');
+      }catch(e){box.textContent='설명을 불러오지 못했습니다.'}
+    }});
+  }catch(e){
+    $('nOut').innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.name==='AbortError'?'시간이 오래 걸립니다. 다시 눌러 주세요.':(e&&e.message||e))+'</small></div>';
+  }finally{clearTimeout(t)}
+}
 function fmt(m){return m>=1000?(m/1000)+'km':m+'m'}
 function here(){return new Promise(function(ok,no){
   if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
@@ -191,7 +238,8 @@ async function near(k,i){
       var cat=(x.category_name||'').split(' > ').slice(1).join(' · ');
       h+='<div class="it"><b>'+esc(x.place_name)+'</b><span class="m">'+fmt(parseInt(x.distance,10)||0)+(cat?' · '+esc(cat):'')+'</span><br><span class="m">'+esc(x.road_address_name||x.address_name||'')+(x.phone?' · '+esc(x.phone):'')+'</span><br>'
         +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.place_name)+','+x.y+','+x.x+'">길안내</a>'
-        +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.place_url||'#')+'">후기·상세</a></div>';
+        +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.place_url||'#')+'">후기·상세</a>'
+        +(k==='gas'?'<a class="lk" target="_blank" rel="noopener" href="https://www.opinet.co.kr/searRgSelect.do">가격 보기(오피넷)</a>':'')+'</div>';
     });
     $('nOut').innerHTML=h+'</div>';
   }catch(e){
