@@ -60,8 +60,8 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
   <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
   <label for="kakao">카카오 REST API 키 (우회 판단용)</label>
   <input id="kakao" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="카카오 REST API 키 32자리">
-  <label for="home">집 위치</label>
-  <input id="home" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
+  <label for="homePos">집 위치</label>
+  <input id="homePos" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
   <label for="work">회사 위치</label>
   <input id="work" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
   <p id="err" class="muted" hidden></p>
@@ -141,12 +141,12 @@ function parsePos(s){
 }
 
 $('saveKey').onclick=function(){
-  var v=$('key').value.trim()||load(), h=$('home').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey')||DEF.kakao, er=$('err');
+  var v=$('key').value.trim()||load(), h=$('homePos').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey')||DEF.kakao, er=$('err');
   if(v.length<16){er.textContent='인증키를 입력해 주세요.';er.hidden=false;return}
   if((h&&!parsePos(h))||(w&&!parsePos(w))){er.textContent='위치 형식을 확인해 주세요. (예: 8Q98CM5J+H5Q 또는 37.40, 126.68)';er.hidden=false;return}
   save(v);put('kakaoKey',kk);put('itsHome',h);put('itsWork',w);er.hidden=true;EDIT=false;$('key').value='';$('kakao').value='';show()
 };
-$('resetKey').onclick=function(){EDIT=true;$('key').value='';$('kakao').value='';$('home').value=get('itsHome');$('work').value=get('itsWork');show()};
+$('resetKey').onclick=function(){EDIT=true;$('key').value='';$('kakao').value='';$('homePos').value=get('itsHome');$('work').value=get('itsWork');show()};
 $('go').onclick=function(){run('go')};
 $('back').onclick=function(){run('back')};
 $('resetKey2').onclick=function(){$('resetKey').onclick()};
