@@ -45,6 +45,10 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .it:first-of-type{border-top:0}
 .it b{display:block;font-size:19px}.it .m{color:var(--sub);font-size:15px}
 .lk{display:inline-block;margin:8px 8px 0 0;padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--main);font-size:15px;font-weight:700;text-decoration:none}
+.gg{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 12px}
+.gg button{min-height:52px;padding:0;border-radius:10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);font-size:18px}
+.gg button.on{background:var(--main);color:var(--onmain)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -75,10 +79,26 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
     <button id="mFood">주변 맛집<small>현재 위치 기준</small></button>
     <button id="mStay">주변 숙소<small>현재 위치 기준</small></button>
     <button id="mPark">주변 공영주차장<small>현재 위치 기준</small></button>
-    <button id="mGas">주변 주유소<small>현재 위치 기준</small></button>
+    <button id="mGas">주유소 가격 판단<small>연료 칸수 기준</small></button>
     <button id="mTour" style="grid-column:1/-1">주변 관광·역사 이야기<small>현재 위치 기준</small></button>
   </div>
   <p style="margin-top:28px"><button class="ghost" id="resetKey2">설정 변경</button></p>
+</section>
+
+<section id="gas" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
+  <div class="card">
+    <h2>남은 연료 (계기판 칸 수, 8=가득)</h2>
+    <div class="gg" id="gauge"></div>
+    <div class="two">
+      <div><label for="gTank">연료통(L)</label><input id="gTank" type="text" inputmode="decimal"></div>
+      <div><label for="gKm">연비(km/L)</label><input id="gKm" type="text" inputmode="decimal"></div>
+    </div>
+    <label for="gPrice">가려는 주유소 가격 (원/L, 선택)</label>
+    <input id="gPrice" type="text" inputmode="numeric" placeholder="예: 1870">
+    <button id="gGo" style="width:100%;margin-top:4px">내 주변 가격 확인</button>
+  </div>
+  <div id="gOut"></div>
 </section>
 
 <section id="near" hidden>
@@ -124,7 +144,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 var EDIT=false;
 function get(n){try{return localStorage.getItem(n)||''}catch(e){return ''}}
 function put(n,v){try{localStorage.setItem(n,v)}catch(e){}}
-function view(n){['setup','home','main','near'].forEach(function(id){$(id).hidden=id!==n});window.scrollTo(0,0)}
+function view(n){['setup','home','main','near','gas'].forEach(function(id){$(id).hidden=id!==n});window.scrollTo(0,0)}
 function show(){var open=!(get('itsHome')&&get('itsWork'))||EDIT;view(open?'setup':'home')}
 
 // 좌표("37.40, 126.68") 또는 구글 플러스 코드("8Q98CM5J+H5Q")를 [위도, 경도]로 바꿉니다
@@ -157,7 +177,7 @@ $('mBack').onclick=function(){view('main');run('back')};
 $('mFood').onclick=function(){near('food',0)};
 $('mStay').onclick=function(){near('stay',0)};
 $('mPark').onclick=function(){near('park',0)};
-$('mGas').onclick=function(){near('gas',0)};
+$('mGas').onclick=gasOpen;
 $('mTour').onclick=function(){tour(0)};
 $('nMore').onclick=function(){if(NK==='tour')tour(NI+1);else near(NK,NI+1)};
 
@@ -170,6 +190,71 @@ var NEAR={
 };
 var NK=null,NI=0;
 var TR=[3000,10000,30000];
+
+// 주유소 가격 판단 (수도권은 주유소별 가격, 그 밖은 시·도 평균)
+var BR={SKE:'SK에너지',GSC:'GS칼텍스',HDO:'현대오일뱅크',SOL:'S-OIL',RTE:'자영알뜰',RTO:'자영알뜰',RTX:'고속도로알뜰',NHO:'농협알뜰',ETC:'자가상표',E1G:'E1',SKG:'SK가스'};
+var GURL='https://raw.githubusercontent.com/hanvit1042/commute-check/main/gas.json';
+function num(n){return Math.round(n).toLocaleString('ko-KR')}
+function hav(a,b,c,d){var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 12742*Math.asin(Math.sqrt(h))}
+function sidoName(n){n=n||'';if(/^(충청|경상|전라)/.test(n))return n[0]+n[2];return n.slice(0,2)}
+function paint(){var g=parseInt(get('gGauge'),10)||4;Array.prototype.forEach.call($('gauge').children,function(b,i){b.className=(i+1===g)?'on':''})}
+function gasOpen(){
+  view('gas');
+  var box=$('gauge');
+  if(!box.children.length){for(var i=1;i<=8;i++){(function(i){var b=document.createElement('button');b.textContent=i;b.onclick=function(){put('gGauge',String(i));paint()};box.appendChild(b)})(i)}}
+  $('gTank').value=get('gTank')||'47';$('gKm').value=get('gKm')||'10';
+  paint();
+}
+async function gasRun(){
+  var g=parseInt(get('gGauge'),10)||4,tank=parseFloat($('gTank').value)||47,km=parseFloat($('gKm').value)||10,my=parseFloat($('gPrice').value.replace(/[^\d.]/g,''))||0;
+  put('gTank',String(tank));put('gKm',String(km));
+  var L=tank*g/8,range=L*km,R=Math.max(5,Math.round(range*0.8));
+  var out=$('gOut');out.innerHTML='<div class="card muted">현재 위치와 가격을 불러오는 중…</div>';
+  $('gGo').disabled=true;
+  try{
+    var p=await here();
+    var hd={headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)}};
+    var res=await Promise.all([
+      fetch(GURL,{cache:'no-store'}).then(function(r){return r.json()}),
+      fetch('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x='+p[1]+'&y='+p[0],hd).then(function(r){return r.json()}).catch(function(){return null})
+    ]);
+    var D=res[0],rg=res[1],sd=null,region='',nat=null;
+    if(rg&&rg.documents&&rg.documents[0]){region=rg.documents[0].region_1depth_name;var nm=sidoName(region);D.sido.forEach(function(s){if(s.n===nm)sd=s})}
+    D.sido.forEach(function(s){if(s.c==='00')nat=s});
+    var bb=D.bbox,inside=p[0]>=bb[0]-0.03&&p[0]<=bb[1]+0.03&&p[1]>=bb[2]-0.03&&p[1]<=bb[3]+0.03;
+    var st=[];
+    if(inside){D.stations.forEach(function(s){var d=hav(p[0],p[1],s.y,s.x);if(d<=R)st.push({s:s,d:d})})}
+    var h='<div class="banner b-ok">갈 수 있는 거리 약 '+Math.round(range)+'km<small>남은 연료 약 '+L.toFixed(1)+'L · 여유 20%를 빼고 반경 '+R+'km로 봅니다</small></div>';
+    var NR=Math.min(R,10),ns=st.filter(function(x){return x.d<=NR}),sel=ns.length?ns:st,NRt=ns.length?NR:R;
+    if(st.length){
+      var pr=sel.map(function(x){return x.s.p}).sort(function(a,b){return a-b});
+      var mn=pr[0],mx=pr[pr.length-1],av=pr.reduce(function(a,b){return a+b},0)/pr.length;
+      h+='<div class="card"><h2>가까운 '+NRt+'km 안 '+sel.length+'곳 (휘발유)</h2><div class="row"><span>가장 쌈</span><b>'+num(mn)+'원</b></div><div class="row"><span>평균</span><b>'+num(av)+'원</b></div><div class="row"><span>가장 비쌈</span><b>'+num(mx)+'원</b></div></div>';
+      if(R>NRt){var al=st.map(function(x){return x.s.p}),amn=Math.min.apply(null,al),amx=Math.max.apply(null,al),aav=al.reduce(function(a,b){return a+b},0)/al.length;h+='<div class="card"><h2>갈 수 있는 반경 '+R+'km 안 '+st.length+'곳</h2><div class="row"><span>가장 쌈</span><b>'+num(amn)+'원</b></div><div class="row"><span>평균</span><b>'+num(aav)+'원</b></div><div class="row"><span>가장 비쌈</span><b>'+num(amx)+'원</b></div></div>'}
+      if(my){
+        var rank=pr.filter(function(v){return v<my}).length/pr.length*100;
+        var lv=rank<=20?['싼 편이에요','b-ok']:rank<=60?['보통이에요','b-warn']:['비싼 편이에요','b-bad'];
+        var fill=Math.max(0,tank-L),extra=Math.max(0,(my-mn)*fill);
+        h+='<div class="banner '+lv[1]+'">'+num(my)+'원은 '+lv[0]+'<small>싼 쪽에서 '+Math.round(rank)+'% 위치 · 평균보다 '+(my>=av?'+':'')+Math.round(my-av)+'원 · 가득 채우면(약 '+fill.toFixed(0)+'L) 최저가보다 약 '+num(extra)+'원 더 냅니다</small></div>';
+      }
+      sel.sort(function(a,b){return a.s.p-b.s.p||a.d-b.d});
+      h+='<div class="card"><h2>싼 곳 5개</h2>';
+      sel.slice(0,5).forEach(function(x){h+='<div class="it"><b>'+esc(x.s.n)+' · '+num(x.s.p)+'원</b><span class="m">'+esc(BR[x.s.b]||'')+' · '+x.d.toFixed(1)+'km</span><br><a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.s.n)+','+x.s.y+','+x.s.x+'">길안내</a></div>'});
+      h+='</div>';
+    }else{
+      h+='<div class="card muted">'+(inside?'이 반경에서 가격 자료를 찾지 못했습니다.':'이 지역은 주유소별 가격이 없습니다(수도권만 제공). 시·도 평균으로 비교합니다.')+'</div>';
+    }
+    if(sd||nat){
+      h+='<div class="card"><h2>지역 평균 (휘발유)</h2>'+(sd?'<div class="row"><span>'+esc(region)+'</span><b>'+num(sd.p)+'원</b></div>':'')+(nat?'<div class="row"><span>전국</span><b>'+num(nat.p)+'원</b></div>':'')+'</div>';
+      if(my&&!st.length){var base=(sd||nat).p,df=my-base,l2=df<=-30?['싼 편이에요','b-ok']:df<30?['보통이에요','b-warn']:['비싼 편이에요','b-bad'];h+='<div class="banner '+l2[1]+'">'+num(my)+'원은 '+l2[0]+'<small>'+(sd?esc(region):'전국')+' 평균보다 '+(df>=0?'+':'')+Math.round(df)+'원</small></div>'}
+    }
+    h+='<p class="muted">가격 기준 '+esc(D.updated)+' (하루 1회 갱신) · 오피넷</p>';
+    out.innerHTML=h;
+  }catch(e){
+    out.innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.message||e)+'</small></div>';
+  }finally{$('gGo').disabled=false}
+}
+$('gGo').onclick=gasRun;
 function clean(s){return String(s||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()}
 async function tour(i){
   NK='tour';NI=i;
