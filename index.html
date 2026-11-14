@@ -143,7 +143,7 @@ var ROUTES = {
 };
 
 var $ = function(id){return document.getElementById(id)};
-var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a',google:'',tour:'03c2f4a4bbcf522b9ef4cac1c84f58bf93a18b96041017bc1380a08c7aa8b93b'};
+var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a',google:'AIzaSyATS2oV4zM_1ZzkygbkzOFGSU5VNROqKVQ',tour:'03c2f4a4bbcf522b9ef4cac1c84f58bf93a18b96041017bc1380a08c7aa8b93b'};
 function load(){try{return localStorage.getItem('itsKey')||DEF.its}catch(e){return DEF.its}}
 function save(v){try{localStorage.setItem('itsKey',v)}catch(e){}}
 function clear(){try{localStorage.removeItem('itsKey')}catch(e){}}
