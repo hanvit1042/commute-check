@@ -35,8 +35,11 @@ h2{font-size:18px;margin:0 0 8px}
 input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
 label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .pin{display:inline-block;background:var(--main);color:var(--onmain);border:2px solid #fff;border-radius:999px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-#map{height:56vh;min-height:300px;border-radius:14px;border:1px solid var(--line);margin-top:12px;z-index:0}
-.cn{display:inline-block;min-width:26px;height:26px;line-height:26px;text-align:center;border-radius:999px;background:#d93025;color:#fff;font-weight:700;font-size:14px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#map{height:50vh;min-height:280px;border-radius:14px;border:1px solid var(--line);margin-top:10px;z-index:0}
+.cn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--main);color:var(--onmain);font-weight:600;font-size:13px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);flex:none}
+.cr{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);text-decoration:none;color:var(--fg);font-size:16px}
+.cr:first-of-type{border-top:0}
+.cr span.go{margin-left:auto;color:var(--main);font-size:14px;white-space:nowrap}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin:0 4px 0 10px}
 .dot:first-child{margin-left:0}
 .menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -462,11 +465,11 @@ function myCams(which,cams){
   MYCAMS[which].forEach(function(m){
     var c=null;
     cams.some(function(x){if(m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
-    if(c){CF.push({n:m[0],c:c});var k=CF.length;out+='<div class="ev"><a class="lk" target="_blank" rel="noopener" href="'+esc(c.u)+'" style="font-size:18px"><span class="cn" style="margin-right:8px">'+k+'</span><b>'+esc(m[0])+'</b> 실시간 보기</a></div>'}
+    if(c){CF.push({n:m[0],c:c});var k=CF.length;out+='<a class="cr" target="_blank" rel="noopener" href="'+esc(c.u)+'"><span class="cn">'+k+'</span><span>'+esc(m[0])+'</span><span class="go">영상 ›</span></a>'}
     else miss.push(m[0]);
   });
-  if(miss.length)out+='<p class="muted" style="margin:10px 0 0">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
-  return '<h2 style="margin:16px 0 0">내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2><div id="map"></div><div class="card">'+out+'</div>';
+  if(miss.length)out+='<p class="muted" style="margin:0;padding:10px 0;border-top:1px solid var(--line)">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
+  return '<h2 style="margin:20px 2px 0;font-size:18px">내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2><div id="map"></div><div class="card" style="padding:4px 16px">'+out+'</div>';
 }
 function drawCamMap(){
   var box=$('map');
@@ -484,7 +487,7 @@ function drawCamMap(){
   });
   CF.forEach(function(f,i){
     var pos=[f.c.y,f.c.x];pts.push(pos);
-    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="cn">'+(i+1)+'</div>',iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:1000})
+    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="cn">'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:1000})
       .bindPopup('<b>'+(i+1)+'. '+esc(f.n)+'</b><br><a href="'+esc(f.c.u)+'" target="_blank" rel="noopener" style="font-size:17px;font-weight:700">실시간 영상 보기</a>')
       .addTo(MAP);
   });
