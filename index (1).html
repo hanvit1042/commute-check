@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<title>원클릭 비서</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161d;--card:#18212b;--fg:#eaf0f6;--sub:#9aa7b4;--line:#2a3643;--main:#5d8fcf;--onmain:#0b1219;--ok:#6fd195;--okbg:#14301f;--warn:#f0b24c;--warnbg:#33260d;--bad:#ff8d85;--badbg:#3a1613}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:18px/1.6 -apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;padding:16px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:0 auto}
+h1{font-size:24px;margin:8px 0 4px}
+.sub{color:var(--sub);font-size:15px;margin:0 0 20px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{font:inherit;font-weight:700;border:0;border-radius:14px;min-height:68px;background:var(--main);color:var(--onmain);cursor:pointer}
+button:disabled{opacity:.55}
+button.ghost{background:transparent;color:var(--sub);border:1px solid var(--line);min-height:44px;font-weight:500;font-size:15px;padding:0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+.banner{border-radius:14px;padding:16px;margin-top:16px;font-weight:700;font-size:20px}
+.banner small{display:block;font-weight:400;font-size:15px;margin-top:2px}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}
+h2{font-size:18px;margin:0 0 8px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.row:first-of-type{border-top:0}
+.row>span:first-child{min-width:0;overflow-wrap:anywhere}
+.chip{white-space:nowrap;font-weight:700;border-radius:999px;padding:0 12px;font-size:15px;align-self:flex-start}
+.c-ok{background:var(--okbg);color:var(--ok)}.c-warn{background:var(--warnbg);color:var(--warn)}.c-bad{background:var(--badbg);color:var(--bad)}
+.ev{padding:10px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.ev:first-of-type{border-top:0}
+.ev b{display:block}.ev span{color:var(--sub);font-size:15px}
+.muted{color:var(--sub);font-size:15px}
+input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
+label{display:block;font-weight:700;font-size:15px;margin-top:8px}
+.pin{display:inline-block;background:var(--main);color:var(--onmain);border:2px solid #fff;border-radius:999px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+#map{height:62vh;min-height:320px;border-radius:14px;border:1px solid var(--line);margin-top:16px;z-index:0}
+.legend{font-size:14px;color:var(--sub);margin:8px 2px 0}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin:0 4px 0 10px}
+.dot:first-child{margin-left:0}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.menu button{min-height:88px}.menu small{display:block;font-weight:400;font-size:14px}
+.it{padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.it:first-of-type{border-top:0}
+.it b{display:block;font-size:19px}.it .m{color:var(--sub);font-size:15px}
+.lk{display:inline-block;margin:8px 8px 0 0;padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--main);font-size:15px;font-weight:700;text-decoration:none}
+.gg{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 12px}
+.gg button{min-height:52px;padding:0;border-radius:10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);font-size:18px}
+.gg button.on{background:var(--main);color:var(--onmain)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>원클릭 비서</h1>
+<p class="sub">버튼 한 번으로 지금 필요한 정보를 확인합니다.</p>
+
+<section id="setup" class="card" hidden>
+  <h2>설정</h2>
+  <p class="muted">입력한 내용은 이 폰에만 저장됩니다.</p>
+  <label for="key">ITS 인증키</label>
+  <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
+  <label for="kakao">카카오 REST API 키 (우회 판단용)</label>
+  <input id="kakao" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="카카오 REST API 키 32자리">
+  <label for="homePos">집 위치</label>
+  <input id="homePos" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
+  <label for="work">회사 위치</label>
+  <input id="work" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
+  <p id="err" class="muted" hidden></p>
+  <button id="saveKey" style="width:100%">저장</button>
+</section>
+
+<section id="home" hidden>
+  <div class="menu">
+    <button id="mGo">출근 확인<small>집 → 회사</small></button>
+    <button id="mBack">퇴근 확인<small>회사 → 집</small></button>
+    <button id="mFood">주변 맛집<small>현재 위치 기준</small></button>
+    <button id="mCafe">주변 까페<small>현재 위치 기준</small></button>
+    <button id="mStay">주변 숙소<small>현재 위치 기준</small></button>
+    <button id="mPark">주변 공영주차장<small>현재 위치 기준</small></button>
+    <button id="mGas">주유소 가격 판단<small>연료 칸수 기준</small></button>
+    <button id="mTour">주변 관광·역사 이야기<small>현재 위치 기준</small></button>
+  </div>
+  <p style="margin-top:28px"><button class="ghost" id="resetKey2">설정 변경</button></p>
+</section>
+
+<section id="gas" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
+  <div class="card">
+    <h2>남은 연료 (계기판 칸 수, 8=가득)</h2>
+    <div class="gg" id="gauge"></div>
+    <div class="two">
+      <div><label for="gTank">연료통(L)</label><input id="gTank" type="text" inputmode="decimal"></div>
+      <div><label for="gKm">연비(km/L)</label><input id="gKm" type="text" inputmode="decimal"></div>
+    </div>
+    <label for="gPrice">가려는 주유소 가격 (원/L, 선택)</label>
+    <input id="gPrice" type="text" inputmode="numeric" placeholder="예: 1870">
+    <button id="gGo" style="width:100%;margin-top:4px">내 주변 가격 확인</button>
+  </div>
+  <div id="gOut"></div>
+</section>
+
+<section id="near" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
+  <h2 id="nTitle"></h2>
+  <div id="nOut"></div>
+  <p><button class="ghost" id="nMore">범위 넓히기</button></p>
+</section>
+
+<section id="main" hidden>
+  <p><button class="ghost toHome">← 처음으로</button></p>
+  <div class="btns">
+    <button id="go">출근 확인<br><small style="font-weight:400;font-size:14px">집 → 회사</small></button>
+    <button id="back">퇴근 확인<br><small style="font-weight:400;font-size:14px">회사 → 집</small></button>
+  </div>
+  <div id="out"></div>
+  <p style="margin-top:28px"><button class="ghost" id="resetKey">설정 변경</button></p>
+</section>
+</main>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+window.onerror=function(m){var d=document.createElement('div');d.className='card';d.style.color='#b3261e';d.textContent='오류: '+m;document.body.appendChild(d)};
+// 지도 조회 범위: 인천 연수구 ~ 서울 강서구
+var BOX = {minX:126.62, maxX:126.95, minY:37.38, maxY:37.58};
+var BASE = 'https://openapi.its.go.kr:9443/';
+
+// 경로별 확인 도로. ev: 사고·공사 글에서 찾을 이름, tr: 소통(속도)에서 찾을 도로명, hw: 고속도로 여부
+var ROUTES = {
+  go:   {name:'출근 · 집 → 회사', alt:'우회 후보: 경인고속도로 경유',
+         roads:[{n:'제2경인고속도로',ev:['제2경인'],tr:['제2경인'],hw:1,part:1},{n:'송내대로',ev:['송내대로'],tr:['송내대로']},{n:'봉오대로',ev:['봉오대로'],tr:['봉오대로']},{n:'오정로',ev:['오정로'],tr:['오정로']},{n:'남부순환로',ev:['남부순환'],tr:['남부순환로']}]},
+  back: {name:'퇴근 · 회사 → 집', alt:'우회 후보: 송내대로 경유',
+         roads:[{n:'남부순환로',ev:['남부순환'],tr:['남부순환로']},{n:'경인고속도로',ev:['경인고속','경인선'],tr:['경인고속도로'],hw:1},{n:'수도권제1순환',ev:['수도권제1순환','외곽순환'],tr:['수도권제1순환','서울외곽'],hw:1,part:1},{n:'제2경인고속도로',ev:['제2경인'],tr:['제2경인'],hw:1,part:1},{n:'송내대로',ev:['송내대로'],tr:['송내대로']}]}
+};
+
+var $ = function(id){return document.getElementById(id)};
+var DEF={its:'aef6b38654b645d5872f7e4bb9ca96d4',kakao:'5de42f394edc6af395c01545d4ced86a',tour:'03c2f4a4bbcf522b9ef4cac1c84f58bf93a18b96041017bc1380a08c7aa8b93b'};
+function load(){try{return localStorage.getItem('itsKey')||DEF.its}catch(e){return DEF.its}}
+function save(v){try{localStorage.setItem('itsKey',v)}catch(e){}}
+function clear(){try{localStorage.removeItem('itsKey')}catch(e){}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+var EDIT=false;
+function get(n){try{return localStorage.getItem(n)||''}catch(e){return ''}}
+function put(n,v){try{localStorage.setItem(n,v)}catch(e){}}
+function view(n){['setup','home','main','near','gas'].forEach(function(id){$(id).hidden=id!==n});window.scrollTo(0,0)}
+function show(){var open=!(get('itsHome')&&get('itsWork'))||EDIT;view(open?'setup':'home')}
+
+// 좌표("37.40, 126.68") 또는 구글 플러스 코드("8Q98CM5J+H5Q")를 [위도, 경도]로 바꿉니다
+function parsePos(s){
+  var m=s.match(/^(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if(m)return [parseFloat(m[1]),parseFloat(m[2])];
+  var A='23456789CFGHJMPQRVWX', c=s.toUpperCase().replace(/\s/g,'');
+  if(c.indexOf('+')!==8||c.length<11)return null;
+  c=c.replace('+','');
+  var lat=-90,lng=-180,res=20,k;
+  for(k=0;k<10;k+=2){var a=A.indexOf(c[k]),b=A.indexOf(c[k+1]);if(a<0||b<0)return null;lat+=a*res;lng+=b*res;if(k<8)res/=20}
+  var ls=res,gs=res;
+  for(k=10;k<c.length;k++){var v=A.indexOf(c[k]);if(v<0)return null;ls/=5;gs/=4;lat+=Math.floor(v/4)*ls;lng+=(v%4)*gs}
+  return [lat+ls/2,lng+gs/2];
+}
+
+$('saveKey').onclick=function(){
+  var v=$('key').value.trim()||load(), h=$('homePos').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey')||DEF.kakao, er=$('err');
+  if(v.length<16){er.textContent='인증키를 입력해 주세요.';er.hidden=false;return}
+  if((h&&!parsePos(h))||(w&&!parsePos(w))){er.textContent='위치 형식을 확인해 주세요. (예: 8Q98CM5J+H5Q 또는 37.40, 126.68)';er.hidden=false;return}
+  save(v);put('kakaoKey',kk);put('itsHome',h);put('itsWork',w);er.hidden=true;EDIT=false;$('key').value='';$('kakao').value='';show()
+};
+$('resetKey').onclick=function(){EDIT=true;$('key').value='';$('kakao').value='';$('homePos').value=get('itsHome');$('work').value=get('itsWork');show()};
+$('go').onclick=function(){run('go')};
+$('back').onclick=function(){run('back')};
+$('resetKey2').onclick=function(){$('resetKey').onclick()};
+document.querySelectorAll('.toHome').forEach(function(b){b.onclick=function(){view('home')}});
+$('mGo').onclick=function(){view('main');run('go')};
+$('mBack').onclick=function(){view('main');run('back')};
+$('mFood').onclick=function(){near('food',0)};
+$('mCafe').onclick=function(){near('cafe',0)};
+$('mStay').onclick=function(){near('stay',0)};
+$('mPark').onclick=function(){near('park',0)};
+$('mGas').onclick=gasOpen;
+$('mTour').onclick=function(){tour(0)};
+$('nMore').onclick=function(){if(NK==='tour')tour(NI+1);else near(NK,NI+1)};
+
+// 현재 위치 기준 주변 검색 (카카오 장소 검색)
+var NEAR={
+  food:{t:'주변 맛집',u:'search/category.json?category_group_code=FD6',r:[500,1000,2000]},
+  cafe:{t:'주변 까페',r:[500,1000,2000]},
+  stay:{t:'주변 숙소',u:'search/category.json?category_group_code=AD5',r:[2000,5000,10000]},
+  park:{t:'주변 공영주차장',u:'search/keyword.json?query='+encodeURIComponent('공영주차장'),r:[500,1000,2000]},
+  gas:{t:'주변 주유소',u:'search/category.json?category_group_code=OL7',r:[2000,5000,10000]}
+};
+var NK=null,NI=0;
+var TR=[3000,10000,30000];
+
+// 주유소 가격 판단 (수도권은 주유소별 가격, 그 밖은 시·도 평균)
+var BR={SKE:'SK에너지',GSC:'GS칼텍스',HDO:'현대오일뱅크',SOL:'S-OIL',RTE:'자영알뜰',RTO:'자영알뜰',RTX:'고속도로알뜰',NHO:'농협알뜰',ETC:'자가상표',E1G:'E1',SKG:'SK가스'};
+var GURL='https://raw.githubusercontent.com/hanvit1042/commute-check/main/gas.json';
+function num(n){return Math.round(n).toLocaleString('ko-KR')}
+function hav(a,b,c,d){var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 12742*Math.asin(Math.sqrt(h))}
+function sidoName(n){n=n||'';if(/^(충청|경상|전라)/.test(n))return n[0]+n[2];return n.slice(0,2)}
+function paint(){var g=parseInt(get('gGauge'),10)||4;Array.prototype.forEach.call($('gauge').children,function(b,i){b.className=(i+1===g)?'on':''})}
+function gasOpen(){
+  view('gas');
+  var box=$('gauge');
+  if(!box.children.length){for(var i=1;i<=8;i++){(function(i){var b=document.createElement('button');b.textContent=i;b.onclick=function(){put('gGauge',String(i));paint()};box.appendChild(b)})(i)}}
+  $('gTank').value=get('gTank')||'47';$('gKm').value=get('gKm')||'10';
+  paint();
+}
+async function gasRun(){
+  var g=parseInt(get('gGauge'),10)||4,tank=parseFloat($('gTank').value)||47,km=parseFloat($('gKm').value)||10,my=parseFloat($('gPrice').value.replace(/[^\d.]/g,''))||0;
+  put('gTank',String(tank));put('gKm',String(km));
+  var L=tank*g/8,range=L*km,R=Math.max(5,Math.round(range*0.8));
+  var out=$('gOut');out.innerHTML='<div class="card muted">현재 위치와 가격을 불러오는 중…</div>';
+  $('gGo').disabled=true;
+  try{
+    var p=await here();
+    var hd={headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)}};
+    var res=await Promise.all([
+      fetch(GURL,{cache:'no-store'}).then(function(r){return r.json()}),
+      fetch('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x='+p[1]+'&y='+p[0],hd).then(function(r){return r.json()}).catch(function(){return null})
+    ]);
+    var D=res[0],rg=res[1],sd=null,region='',nat=null;
+    if(rg&&rg.documents&&rg.documents[0]){region=rg.documents[0].region_1depth_name;var nm=sidoName(region);D.sido.forEach(function(s){if(s.n===nm)sd=s})}
+    D.sido.forEach(function(s){if(s.c==='00')nat=s});
+    var bb=D.bbox,inside=p[0]>=bb[0]-0.03&&p[0]<=bb[1]+0.03&&p[1]>=bb[2]-0.03&&p[1]<=bb[3]+0.03;
+    var st=[];
+    if(inside){D.stations.forEach(function(s){var d=hav(p[0],p[1],s.y,s.x);if(d<=R)st.push({s:s,d:d})})}
+    var h='<div class="banner b-ok">갈 수 있는 거리 약 '+Math.round(range)+'km<small>남은 연료 약 '+L.toFixed(1)+'L · 여유 20%를 빼고 반경 '+R+'km로 봅니다</small></div>';
+    var NR=Math.min(R,10),ns=st.filter(function(x){return x.d<=NR}),sel=ns.length?ns:st,NRt=ns.length?NR:R;
+    if(st.length){
+      var pr=sel.map(function(x){return x.s.p}).sort(function(a,b){return a-b});
+      var mn=pr[0],mx=pr[pr.length-1],av=pr.reduce(function(a,b){return a+b},0)/pr.length;
+      h+='<div class="card"><h2>가까운 '+NRt+'km 안 '+sel.length+'곳 (휘발유)</h2><div class="row"><span>가장 쌈</span><b>'+num(mn)+'원</b></div><div class="row"><span>평균</span><b>'+num(av)+'원</b></div><div class="row"><span>가장 비쌈</span><b>'+num(mx)+'원</b></div></div>';
+      if(R>NRt){var al=st.map(function(x){return x.s.p}),amn=Math.min.apply(null,al),amx=Math.max.apply(null,al),aav=al.reduce(function(a,b){return a+b},0)/al.length;h+='<div class="card"><h2>갈 수 있는 반경 '+R+'km 안 '+st.length+'곳</h2><div class="row"><span>가장 쌈</span><b>'+num(amn)+'원</b></div><div class="row"><span>평균</span><b>'+num(aav)+'원</b></div><div class="row"><span>가장 비쌈</span><b>'+num(amx)+'원</b></div></div>'}
+      if(my){
+        var rank=pr.filter(function(v){return v<my}).length/pr.length*100;
+        var lv=rank<=20?['싼 편이에요','b-ok']:rank<=60?['보통이에요','b-warn']:['비싼 편이에요','b-bad'];
+        var fill=Math.max(0,tank-L),extra=Math.max(0,(my-mn)*fill);
+        h+='<div class="banner '+lv[1]+'">'+num(my)+'원은 '+lv[0]+'<small>싼 쪽에서 '+Math.round(rank)+'% 위치 · 평균보다 '+(my>=av?'+':'')+Math.round(my-av)+'원 · 가득 채우면(약 '+fill.toFixed(0)+'L) 최저가보다 약 '+num(extra)+'원 더 냅니다</small></div>';
+      }
+      sel.sort(function(a,b){return a.s.p-b.s.p||a.d-b.d});
+      h+='<div class="card"><h2>싼 곳 5개</h2>';
+      sel.slice(0,5).forEach(function(x){h+='<div class="it"><b>'+esc(x.s.n)+' · '+num(x.s.p)+'원</b><span class="m">'+esc(BR[x.s.b]||'')+' · '+x.d.toFixed(1)+'km</span><br><a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.s.n)+','+x.s.y+','+x.s.x+'">길안내</a></div>'});
+      h+='</div>';
+    }else{
+      h+='<div class="card muted">'+(inside?'이 반경에서 가격 자료를 찾지 못했습니다.':'이 지역은 주유소별 가격이 없습니다(수도권만 제공). 시·도 평균으로 비교합니다.')+'</div>';
+    }
+    if(sd||nat){
+      h+='<div class="card"><h2>지역 평균 (휘발유)</h2>'+(sd?'<div class="row"><span>'+esc(region)+'</span><b>'+num(sd.p)+'원</b></div>':'')+(nat?'<div class="row"><span>전국</span><b>'+num(nat.p)+'원</b></div>':'')+'</div>';
+      if(my&&!st.length){var base=(sd||nat).p,df=my-base,l2=df<=-30?['싼 편이에요','b-ok']:df<30?['보통이에요','b-warn']:['비싼 편이에요','b-bad'];h+='<div class="banner '+l2[1]+'">'+num(my)+'원은 '+l2[0]+'<small>'+(sd?esc(region):'전국')+' 평균보다 '+(df>=0?'+':'')+Math.round(df)+'원</small></div>'}
+    }
+    h+='<p class="muted">가격 기준 '+esc(D.updated)+' (하루 1회 갱신) · 오피넷</p>';
+    out.innerHTML=h;
+  }catch(e){
+    out.innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.message||e)+'</small></div>';
+  }finally{$('gGo').disabled=false}
+}
+$('gGo').onclick=gasRun;
+function clean(s){return String(s||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()}
+async function tour(i){
+  NK='tour';NI=i;
+  view('near');
+  $('nTitle').textContent='주변 관광·역사 · 반경 '+fmt(TR[i]);
+  $('nMore').hidden=i>=TR.length-1;
+  $('nOut').innerHTML='<div class="card muted">현재 위치 확인 중…</div>';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},20000);
+  try{
+    var p=await here();
+    var B='https://apis.data.go.kr/B551011/KorService2/';
+    var q='serviceKey='+DEF.tour+'&MobileOS=ETC&MobileApp=oneclick&_type=json';
+    var r=await fetch(B+'locationBasedList2?'+q+'&mapX='+p[1]+'&mapY='+p[0]+'&radius='+TR[i]+'&arrange=E&numOfRows=15&contentTypeId=12',{signal:c.signal});
+    var j=await r.json();
+    var it=(j.response&&j.response.body&&j.response.body.items&&j.response.body.items.item)||[];
+    if(!it.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 관광지가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+    var h='<div class="card">';
+    it.forEach(function(x,n){
+      h+='<div class="it"><b>'+esc(x.title)+'</b><span class="m">'+fmt(Math.round(parseFloat(x.dist)||0))+' · '+esc(x.addr1||'')+'</span><br>'
+        +(x.firstimage?'<img src="'+esc(x.firstimage.replace(/^http:/,'https:'))+'" alt="" loading="lazy" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px">':'')
+        +'<br><button class="ghost" data-id="'+esc(x.contentid)+'" data-n="'+n+'" style="margin-top:8px">이야기 보기</button> '
+        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.title)+','+x.mapy+','+x.mapx+'">길안내</a>'
+        +'<div class="muted" id="st'+n+'" style="white-space:pre-line;margin-top:8px" hidden></div></div>';
+    });
+    $('nOut').innerHTML=h+'</div>';
+    $('nOut').querySelectorAll('button[data-id]').forEach(function(b){b.onclick=async function(){
+      var box=$('st'+b.getAttribute('data-n'));
+      if(!box.hidden){box.hidden=true;b.textContent='이야기 보기';return}
+      box.hidden=false;b.textContent='이야기 닫기';
+      if(box.getAttribute('data-ok'))return;
+      box.textContent='불러오는 중…';
+      try{
+        var r2=await fetch(B+'detailCommon2?'+q+'&contentId='+b.getAttribute('data-id'));
+        var j2=await r2.json();
+        box.textContent=clean(j2.response.body.items.item[0].overview)||'등록된 설명이 없습니다.';
+        box.setAttribute('data-ok','1');
+      }catch(e){box.textContent='설명을 불러오지 못했습니다.'}
+    }});
+  }catch(e){
+    $('nOut').innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.name==='AbortError'?'시간이 오래 걸립니다. 다시 눌러 주세요.':(e&&e.message||e))+'</small></div>';
+  }finally{clearTimeout(t)}
+}
+function fmt(m){return m>=1000?(m/1000)+'km':m+'m'}
+function here(){return new Promise(function(ok,no){
+  if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
+  navigator.geolocation.getCurrentPosition(function(p){ok([p.coords.latitude,p.coords.longitude])},function(){no(new Error('위치 권한을 허용해 주세요'))},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+})}
+async function near(k,i){
+  var N=NEAR[k];NK=k;NI=i;
+  view('near');
+  $('nTitle').textContent=N.t+' · 반경 '+fmt(N.r[i]);
+  $('nMore').hidden=i>=N.r.length-1;
+  $('nOut').innerHTML='<div class="card muted">현재 위치 확인 중…</div>';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},15000);
+  try{
+    var p=await here();
+    if(k==='cafe'){
+      var B2='https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius?serviceKey='+DEF.tour+'&numOfRows=100&radius='+N.r[i]+'&cx='+p[1]+'&cy='+p[0]+'&indsSclsCd=I21201&type=json';
+      var j1=await (await fetch(B2+'&pageNo=1',{signal:c.signal})).json();
+      if(!j1.body||(j1.header&&j1.header.resultCode!=='00'))throw new Error((j1.header&&j1.header.resultMsg)||'조회 실패');
+      var tot=parseInt(j1.body.totalCount,10)||0,all=[].concat(j1.body.items||[]);
+      var pg=Math.min(5,Math.ceil(tot/100)),rest=[];
+      for(var q=2;q<=pg;q++)rest.push(fetch(B2+'&pageNo='+q,{signal:c.signal}).then(function(r){return r.json()}).then(function(x){return (x.body&&x.body.items)||[]}));
+      (await Promise.all(rest)).forEach(function(a){all=all.concat(a)});
+      all.forEach(function(x){x._d=hav(p[0],p[1],x.lat,x.lon)*1000});
+      all.sort(function(a,b){return a._d-b._d});
+      if(!all.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 까페가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+      var hc='<div class="card">';
+      all.slice(0,15).forEach(function(x){
+        var nm=x.bizesNm+(x.brchNm?' '+x.brchNm:'');
+        var loc=(x.bldNm?x.bldNm+' ':'')+(x.flrNo?x.flrNo+'층':'');
+        hc+='<div class="it"><b>'+esc(nm)+'</b><span class="m">'+fmt(Math.round(x._d))+(loc?' · '+esc(loc):'')+'</span><br><span class="m">'+esc(x.rdnmAdr||x.lnoAdr||'')+'</span><br>'
+          +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.lat+','+x.lon+'">길안내</a>'
+          +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/?q='+encodeURIComponent((x.signguNm||'')+' '+nm)+'">후기·상세</a></div>';
+      });
+      hc+='</div><p class="muted">반경 안 까페 '+tot+'곳 중 가까운 '+Math.min(15,all.length)+'곳 · 소상공인시장진흥공단 상가정보 기준(신규·폐업 반영이 늦을 수 있음)</p>';
+      $('nOut').innerHTML=hc;
+      return;
+    }
+    var u='https://dapi.kakao.com/v2/local/'+N.u+'&x='+p[1]+'&y='+p[0]+'&radius='+N.r[i]+'&sort=distance&size=15';
+    var r=await fetch(u,{headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)},signal:c.signal});
+    var j=await r.json();
+    if(!j.documents)throw new Error(j.message||'조회 실패');
+    var d=j.documents;
+    if(k==='park'){var g=d.filter(function(x){return x.place_name.indexOf('공영')>-1});if(g.length)d=g}
+    if(!d.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 결과가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+    var h='<div class="card">';
+    d.forEach(function(x){
+      var cat=(x.category_name||'').split(' > ').slice(1).join(' · ');
+      h+='<div class="it"><b>'+esc(x.place_name)+'</b><span class="m">'+fmt(parseInt(x.distance,10)||0)+(cat?' · '+esc(cat):'')+'</span><br><span class="m">'+esc(x.road_address_name||x.address_name||'')+(x.phone?' · '+esc(x.phone):'')+'</span><br>'
+        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.place_name)+','+x.y+','+x.x+'">길안내</a>'
+        +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.place_url||'#')+'">후기·상세</a>'
+        +(k==='gas'?'<a class="lk" target="_blank" rel="noopener" href="https://www.opinet.co.kr/searRgSelect.do">가격 보기(오피넷)</a>':'')+'</div>';
+    });
+    $('nOut').innerHTML=h+'</div>';
+  }catch(e){
+    $('nOut').innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.name==='AbortError'?'시간이 오래 걸립니다. 다시 눌러 주세요.':(e&&e.message||e))+'</small></div>';
+  }finally{clearTimeout(t)}
+}
+
+async function call(path, params, key, ms){
+  var u=BASE+path+'?apiKey='+encodeURIComponent(key)+'&'+params+'&getType=json';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},ms||20000);
+  try{
+    var r=await fetch(u,{signal:c.signal});
+    var j=await r.json();
+    if(j.header&&j.header.resultCode!==0){throw new Error(j.header.resultMsg||'조회 실패')}
+    return (j.body&&j.body.items)||[];
+  }finally{clearTimeout(t)}
+}
+
+
+// 카카오 길찾기: 지금 교통 기준 예상 시간으로 평소 길 vs 우회 길 비교
+var USUAL = {go:'sn', back:'gi'};
+var KIND = {sn:'송내대로 경유', gi:'경인·제1순환 경유'};
+async function verdict(which){
+  var kk=get('kakaoKey')||DEF.kakao, H=parsePos(get('itsHome')), W=parsePos(get('itsWork'));
+  if(!kk||!H||!W)return '<div class="card muted">우회 판단을 쓰려면 아래 "설정 변경"에서 카카오 키와 집·회사 위치를 입력해 주세요.</div>';
+  var o=which==='go'?H:W, d=which==='go'?W:H;
+  var u='https://apis-navi.kakaomobility.com/v1/directions?origin='+o[1]+','+o[0]+'&destination='+d[1]+','+d[0]+'&priority=RECOMMEND&alternatives=true&road_details=false';
+  var c=new AbortController();var t=setTimeout(function(){c.abort()},15000);
+  try{
+    var r=await fetch(u,{headers:{Authorization:'KakaoAK '+kk},signal:c.signal});
+    var j=await r.json();
+    if(!j.routes||!j.routes.length)throw new Error(j.msg||'경로 없음');
+    var best={};
+    j.routes.forEach(function(rt){
+      if(!rt.summary)return;
+      var m={};(rt.sections||[]).forEach(function(s){(s.roads||[]).forEach(function(x){m[x.name]=(m[x.name]||0)+x.distance})});
+      var kind='x';
+      if((m['송내대로']||0)>2000)kind='sn';
+      else if((m['경인고속도로']||0)+(m['수도권제1순환고속도로']||0)>3000)kind='gi';
+      var min=Math.round(rt.summary.duration/60);
+      if(!best[kind]||min<best[kind])best[kind]=min;
+    });
+    var us=USUAL[which], al=us==='sn'?'gi':'sn';
+    if(best[us]==null||best[al]==null){
+      var f=Math.min.apply(null,Object.keys(best).map(function(k){return best[k]}));
+      return '<div class="banner b-ok">지금 예상 '+f+'분<small>평소 길과 우회 길을 구분하지 못했습니다. 아래 사고·공사를 참고하세요.</small></div>';
+    }
+    var diff=best[us]-best[al];
+    if(diff>=5)return '<div class="banner b-bad">'+KIND[al]+'으로 가세요<small>평소 길 '+best[us]+'분 → 우회 '+best[al]+'분 · <b>'+diff+'분 빠름</b></small></div>';
+    return '<div class="banner b-ok">평소 길로 가세요<small>'+KIND[us]+' '+best[us]+'분 · 우회 '+KIND[al]+' '+best[al]+'분</small></div>';
+  }catch(e){
+    return '<div class="card muted">우회 판단을 불러오지 못했습니다. 카카오 키를 확인해 주세요.</div>';
+  }finally{clearTimeout(t)}
+}
+
+var MAP=null;
+function drawMap(events,mine){
+  var box=$('map');
+  if(!box)return;
+  if(typeof L==='undefined'){box.outerHTML='<div class="card muted">지도를 불러오지 못했습니다</div>';return}
+  if(MAP){MAP.remove();MAP=null}
+  MAP=L.map('map').fitBounds([[BOX.minY,BOX.minX],[BOX.maxY,BOX.maxX]]);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(MAP);
+  [['집','itsHome'],['회사','itsWork']].forEach(function(p){
+    var pos=parsePos(get(p[1]));
+    if(!pos)return;
+    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="pin">'+p[0]+'</div>',iconSize:null,iconAnchor:[18,12]}),zIndexOffset:1000}).addTo(MAP);
+  });
+  var set=new Set(mine);
+  var list=events.slice().sort(function(a,b){return (set.has(a)?1:0)-(set.has(b)?1:0)});
+  list.forEach(function(e){
+    var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
+    if(isNaN(x)||isNaN(y))return;
+    var my=set.has(e),acc=e.eventType==='교통사고';
+    L.circleMarker([y,x],{radius:my?12:5,color:my?'#ffffff':'#777777',weight:my?3:1,fillColor:acc?'#d93025':(my?'#f29900':'#9aa0a6'),fillOpacity:my?0.95:0.6})
+      .bindPopup('<b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b><br>'+esc(e.message||e.eventDetailType||'')+'<br>'+hhmm(e.startDate)+' 발생')
+      .addTo(MAP);
+  });
+}
+
+function state(avg,hw){var a=hw?[60,40]:[30,20];return avg>=a[0]?['원활','c-ok',0]:avg>=a[1]?['서행','c-warn',1]:['정체','c-bad',2]}
+function hhmm(s){return s&&s.length>=12?s.slice(4,6)+'/'+s.slice(6,8)+' '+s.slice(8,10)+':'+s.slice(10,12):''}
+
+async function run(which){
+  var key=load(), R=ROUTES[which], out=$('out');
+  $('go').disabled=$('back').disabled=true;
+  out.innerHTML='<div class="card muted">조회 중입니다…</div>';
+  var vp=verdict(which);
+  try{
+    var box='minX='+BOX.minX+'&maxX='+BOX.maxX+'&minY='+BOX.minY+'&maxY='+BOX.maxY;
+    var tf=false;
+    var res=await Promise.all([
+      call('eventInfo','type=all&eventType=all&'+box,key),
+      call('trafficInfo','type=all&drcType=all&'+box,key,50000).catch(function(){tf=true;return []})
+    ]);
+    var events=res[0], traffic=res[1];
+
+    // 내 도로에 해당하는 사고·공사
+    var mine=events.filter(function(e){
+      return R.roads.some(function(r){return r.ev.some(function(k){return (e.roadName||'').indexOf(k)>-1||(e.message||'').indexOf(k)>-1})});
+    });
+    var acc=mine.filter(function(e){return e.eventType==='교통사고'});
+
+    // 도로별 평균 속도
+    var worst=0, rows=[], none=[];
+    R.roads.forEach(function(r){
+      var s=0,n=0;
+      traffic.forEach(function(t){
+        var nm=t.roadName||'', v=parseFloat(t.speed);
+        if(isNaN(v)) return;
+        var hit=r.tr.some(function(k){return r.hw?nm.indexOf(k)>-1:nm===k});
+        if(hit){s+=v;n++}
+      });
+      if(!n){none.push(r.n);return}
+      var avg=s/n, st=state(avg,r.hw);
+      if(st[2]>worst)worst=st[2];
+      rows.push('<div class="row"><span>'+esc(r.n)+(r.part?' <span class="muted">(일부 구간)</span>':'')+'<br><span class="muted">평균 '+avg.toFixed(0)+'km/h</span></span><span class="chip '+st[1]+'">'+st[0]+'</span></div>');
+    });
+
+    var level=(acc.length||worst===2)?2:(mine.length||worst===1)?1:0;
+    var cls=['b-ok','b-warn','b-bad'][level];
+    var title=['이상 없음','주의가 필요합니다','우회를 검토하세요'][level];
+    var line=acc.length?('교통사고 '+acc.length+'건'):'';
+    if(mine.length-acc.length>0){line+=(line?' · ':'')+'공사·기타 '+(mine.length-acc.length)+'건'}
+    if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
+    var h=await vp;
+    h+='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
+    h+='<div id="map"></div><p class="legend"><span class="dot" style="background:#d93025"></span>사고<span class="dot" style="background:#f29900"></span>공사·기타<span class="dot" style="background:#9aa0a6"></span>내 도로 아님 (큰 핀이 내 도로)</p>';
+
+    h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">'+(tf?'소통 자료를 불러오지 못했습니다. 다시 눌러 보세요.':'소통 자료가 없습니다')+'</span>')+(none.length&&!tf?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
+
+    h+='<div class="card"><h2>사고·공사</h2>';
+    if(!mine.length){h+='<span class="muted">해당 없음</span>'}
+    else mine.slice(0,15).forEach(function(e){
+      h+='<div class="ev"><b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b>'+esc(e.message||e.eventDetailType||'')+(e.lanesBlocked?'<br><span>'+esc(e.lanesBlocked)+'</span>':'')+'<br><span>'+hhmm(e.startDate)+' 발생</span></div>';
+    });
+    h+='</div>';
+    h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건</p>';
+    out.innerHTML=h;
+    drawMap(events,mine);
+  }catch(err){
+    var m=String(err&&err.message||err);
+    out.innerHTML=(await vp)+'<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "설정 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
+  }finally{$('go').disabled=$('back').disabled=false}
+}
+show();
+</script>
+</body>
+</html>
