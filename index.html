@@ -310,6 +310,8 @@ async function tour(i){
     $('nOut').innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(e&&e.name==='AbortError'?'시간이 오래 걸립니다. 다시 눌러 주세요.':(e&&e.message||e))+'</small></div>';
   }finally{clearTimeout(t)}
 }
+var G_MAX=950;
+function gUse(){var m=new Date().toISOString().slice(0,7),o={};try{o=JSON.parse(get('gCnt')||'{}')}catch(e){}return o.m===m?{m:m,n:o.n||0}:{m:m,n:0}}
 function fmt(m){return m>=1000?(m/1000)+'km':m+'m'}
 function here(){return new Promise(function(ok,no){
   if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
@@ -333,6 +335,9 @@ async function near(k,i){
         +'<button id="gkSave" style="width:100%;margin-top:8px">저장하고 조회</button></div>';
         $('gkSave').onclick=function(){var v=$('gkInline').value.trim();if(v.length<20){$('gkInline').placeholder='키를 다시 확인해 주세요';$('gkInline').value='';return}put('gKey',v);near(NK,NI)};
         return}
+      var gu=gUse();
+      if(gu.n>=G_MAX){$('nOut').innerHTML='<div class="banner b-bad">이번 달 구글 추천순 사용 한도('+G_MAX+'회)에 도달했습니다<small>과금을 막기 위해 조회를 멈췄습니다. "가까운 순" 탭은 계속 쓸 수 있고, 다음 달 1일에 다시 열립니다.</small></div>';return}
+      gu.n++;put('gCnt',JSON.stringify(gu));
       var gr=await fetch('https://places.googleapis.com/v1/places:searchNearby',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.googleMapsUri'},body:JSON.stringify({includedTypes:k==='cafe'?['cafe']:['restaurant'],excludedTypes:k==='cafe'?[]:['cafe','coffee_shop'],maxResultCount:20,languageCode:'ko',locationRestriction:{circle:{center:{latitude:p[0],longitude:p[1]},radius:N.r[i]}}}),signal:c.signal});
       var gj=await gr.json();
       if(gj.error)throw new Error('구글 조회 실패: '+(gj.error.message||gj.error.status));
@@ -349,7 +354,8 @@ async function near(k,i){
           +(x.location?'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.location.latitude+','+x.location.longitude+'">길안내</a>':'')
           +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.googleMapsUri||'#')+'">구글 후기</a></div>';
       });
-      $('nOut').innerHTML=rh+'</div><p class="muted">반경 안 인기 '+LB+' 최대 20곳 중 별점 높은 순 · 리뷰 10개 이상 우선 · 구글 지도 기준</p>';
+      var left=G_MAX-gu.n;
+      $('nOut').innerHTML=(left<=100?'<div class="banner b-bad">이번 달 추천순 조회 '+left+'회 남음<small>0이 되면 과금 방지를 위해 자동으로 멈춥니다</small></div>':'')+rh+'</div><p class="muted">반경 안 인기 '+LB+' 최대 20곳 중 별점 높은 순 · 리뷰 10개 이상 우선 · 구글 지도 기준<br>이번 달 추천순 조회 '+left+'회 남음 (무료 1,000회 기준, 이 폰 기준 집계)</p>';
       return;
     }
     if(k==='cafe'){
