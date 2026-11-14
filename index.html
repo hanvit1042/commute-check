@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f3a5f">
 <title>원클릭 비서</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161d;--card:#18212b;--fg:#eaf0f6;--sub:#9aa7b4;--line:#2a3643;--main:#5d8fcf;--onmain:#0b1219;--ok:#6fd195;--okbg:#14301f;--warn:#f0b24c;--warnbg:#33260d;--bad:#ff8d85;--badbg:#3a1613}}
@@ -35,8 +34,6 @@ h2{font-size:18px;margin:0 0 8px}
 input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
 label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .pin{display:inline-block;background:var(--main);color:var(--onmain);border:2px solid #fff;border-radius:999px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-#map{height:62vh;min-height:320px;border-radius:14px;border:1px solid var(--line);margin-top:16px;z-index:0}
-.legend{font-size:14px;color:var(--sub);margin:8px 2px 0}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin:0 4px 0 10px}
 .dot:first-child{margin-left:0}
 .menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -127,7 +124,6 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 </section>
 </main>
 
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 window.onerror=function(m){var d=document.createElement('div');d.className='card';d.style.color='#b3261e';d.textContent='오류: '+m;document.body.appendChild(d)};
 // 지도 조회 범위: 인천 연수구 ~ 서울 강서구
@@ -452,44 +448,17 @@ async function verdict(which){
   }finally{clearTimeout(t)}
 }
 
-var MAP=null;
-function drawMap(events,mine){
-  var box=$('map');
-  if(!box)return;
-  if(typeof L==='undefined'){box.outerHTML='<div class="card muted">지도를 불러오지 못했습니다</div>';return}
-  if(MAP){MAP.remove();MAP=null}
-  MAP=L.map('map').fitBounds([[BOX.minY,BOX.minX],[BOX.maxY,BOX.maxX]]);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(MAP);
-  [['집','itsHome'],['회사','itsWork']].forEach(function(p){
-    var pos=parsePos(get(p[1]));
-    if(!pos)return;
-    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="pin">'+p[0]+'</div>',iconSize:null,iconAnchor:[18,12]}),zIndexOffset:1000}).addTo(MAP);
+var MYCAMS=[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리']],['송내대로 부천체육관사거리',['부천체육관']]];
+function myCams(cams){
+  var out='',miss=[];
+  MYCAMS.forEach(function(m){
+    var c=null;
+    cams.some(function(x){if(m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
+    if(c)out+='<div class="ev"><a class="lk" target="_blank" rel="noopener" href="'+esc(c.u)+'" style="font-size:18px"><b>'+esc(m[0])+'</b> 실시간 보기</a></div>';
+    else miss.push(m[0]);
   });
-  var set=new Set(mine);
-  var list=events.slice().sort(function(a,b){return (set.has(a)?1:0)-(set.has(b)?1:0)});
-  list.forEach(function(e){
-    var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
-    if(isNaN(x)||isNaN(y))return;
-    var my=set.has(e),acc=e.eventType==='교통사고';
-    L.circleMarker([y,x],{radius:my?12:5,color:my?'#ffffff':'#777777',weight:my?3:1,fillColor:acc?'#d93025':(my?'#f29900':'#9aa0a6'),fillOpacity:my?0.95:0.6})
-      .bindPopup('<b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b><br>'+esc(e.message||e.eventDetailType||'')+'<br>'+hhmm(e.startDate)+' 발생')
-      .addTo(MAP);
-  });
-}
-
-function myCams(R,cams){
-  var toks=[];R.roads.forEach(function(r){(r.ev||[]).concat(r.tr||[]).forEach(function(t){if(toks.indexOf(t)<0)toks.push(t)})});
-  var out='';
-  R.roads.forEach(function(r){
-    var ts=(r.ev||[]).concat(r.tr||[]);
-    var l=cams.filter(function(c){return ts.some(function(t){return c.n.indexOf(t)>=0})});
-    if(!l.length)return;
-    out+='<div class="ev"><b>'+esc(r.n)+' CCTV '+l.length+'곳</b>';
-    l.slice(0,8).forEach(function(c){out+='<br><a class="lk" target="_blank" rel="noopener" href="'+esc(c.u)+'">'+esc(c.n)+'</a>'});
-    if(l.length>8)out+='<br><span>외 '+(l.length-8)+'곳</span>';
-    out+='</div>';
-  });
-  return '<div class="card"><h2>내 도로 CCTV</h2>'+(out||'<span class="muted">내 도로 이름과 일치하는 CCTV를 찾지 못했습니다'+(cams.length?' (구간 전체 '+cams.length+'곳)':'')+'</span>')+'</div>';
+  if(miss.length)out+='<p class="muted" style="margin:10px 0 0">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
+  return '<div class="card"><h2>내 출근길 CCTV</h2>'+out+'</div>';
 }
 function camLink(e,cams){
   var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
@@ -547,11 +516,10 @@ async function run(which){
     if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
     var h=await vp;
     h+='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
-    h+='<div id="map"></div><p class="legend"><span class="dot" style="background:#d93025"></span>사고<span class="dot" style="background:#f29900"></span>공사·기타<span class="dot" style="background:#9aa0a6"></span>내 도로 아님 (큰 핀이 내 도로)</p>';
+    h+=myCams(cams);
 
     h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">'+(tf?'소통 자료를 불러오지 못했습니다. 다시 눌러 보세요.':'소통 자료가 없습니다')+'</span>')+(none.length&&!tf?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
 
-    h+=myCams(R,cams);
     h+='<div class="card"><h2>사고·공사</h2>';
     if(!mine.length){h+='<span class="muted">해당 없음</span>'}
     else mine.slice(0,15).forEach(function(e){
@@ -560,7 +528,6 @@ async function run(which){
     h+='</div>';
     h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건<br>CCTV '+(cerr?'조회 실패: '+esc(cerr):cams.length+'곳 조회됨')+'</p>';
     out.innerHTML=h;
-    drawMap(events,mine);
   }catch(err){
     var m=String(err&&err.message||err);
     out.innerHTML=(await vp)+'<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "설정 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
