@@ -409,8 +409,9 @@ async function call(path, params, key, ms){
   try{
     var r=await fetch(u,{signal:c.signal});
     var j=await r.json();
-    if(j.header&&j.header.resultCode!==0){throw new Error(j.header.resultMsg||'조회 실패')}
-    return (j.body&&j.body.items)||[];
+    if(j.header&&j.header.resultCode!==0&&j.header.resultCode!=='0'){throw new Error(j.header.resultMsg||'조회 실패')}
+    var it=(j.body&&j.body.items)||(j.response&&j.response.data)||j.data||[];
+    return Array.isArray(it)?it:[it];
   }finally{clearTimeout(t)}
 }
 
