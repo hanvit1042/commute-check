@@ -49,6 +49,10 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .gg button{min-height:52px;padding:0;border-radius:10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);font-size:18px}
 .gg button.on{background:var(--main);color:var(--onmain)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tabs button{min-height:48px;background:var(--card);color:var(--main);border:1px solid var(--line);font-size:16px}
+.tabs button.on{background:var(--main);color:var(--onmain);border-color:var(--main)}
+.star{color:#c77700;font-weight:700}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -64,6 +68,8 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
   <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
   <label for="kakao">카카오 REST API 키 (우회 판단용)</label>
   <input id="kakao" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="카카오 REST API 키 32자리">
+  <label for="gkey">구글 지도 키 (까페 추천순용)</label>
+  <input id="gkey" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="비워 두면 기존 값 유지">
   <label for="homePos">집 위치</label>
   <input id="homePos" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
   <label for="work">회사 위치</label>
@@ -77,10 +83,11 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
     <button id="mGo">출근 확인<small>집 → 회사</small></button>
     <button id="mBack">퇴근 확인<small>회사 → 집</small></button>
     <button id="mFood">주변 맛집<small>현재 위치 기준</small></button>
+    <button id="mCafe">주변 까페<small>현재 위치 기준</small></button>
     <button id="mStay">주변 숙소<small>현재 위치 기준</small></button>
     <button id="mPark">주변 공영주차장<small>현재 위치 기준</small></button>
     <button id="mGas">주유소 가격 판단<small>연료 칸수 기준</small></button>
-    <button id="mTour" style="grid-column:1/-1">주변 관광·역사 이야기<small>현재 위치 기준</small></button>
+    <button id="mTour">주변 관광·역사 이야기<small>현재 위치 기준</small></button>
   </div>
   <p style="margin-top:28px"><button class="ghost" id="resetKey2">설정 변경</button></p>
 </section>
@@ -104,6 +111,7 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 <section id="near" hidden>
   <p><button class="ghost toHome">← 처음으로</button></p>
   <h2 id="nTitle"></h2>
+  <div class="tabs" id="cTabs" hidden><button id="tNear">가까운 순</button><button id="tRate">추천순(별점)</button></div>
   <div id="nOut"></div>
   <p><button class="ghost" id="nMore">범위 넓히기</button></p>
 </section>
@@ -165,9 +173,9 @@ $('saveKey').onclick=function(){
   var v=$('key').value.trim()||load(), h=$('homePos').value.trim(), w=$('work').value.trim(), kk=$('kakao').value.trim()||get('kakaoKey')||DEF.kakao, er=$('err');
   if(v.length<16){er.textContent='인증키를 입력해 주세요.';er.hidden=false;return}
   if((h&&!parsePos(h))||(w&&!parsePos(w))){er.textContent='위치 형식을 확인해 주세요. (예: 8Q98CM5J+H5Q 또는 37.40, 126.68)';er.hidden=false;return}
-  save(v);put('kakaoKey',kk);put('itsHome',h);put('itsWork',w);er.hidden=true;EDIT=false;$('key').value='';$('kakao').value='';show()
+  save(v);put('kakaoKey',kk);if($('gkey').value.trim())put('gKey',$('gkey').value.trim());$('gkey').value='';put('itsHome',h);put('itsWork',w);er.hidden=true;EDIT=false;$('key').value='';$('kakao').value='';show()
 };
-$('resetKey').onclick=function(){EDIT=true;$('key').value='';$('kakao').value='';$('homePos').value=get('itsHome');$('work').value=get('itsWork');show()};
+$('resetKey').onclick=function(){EDIT=true;$('gkey').value='';$('key').value='';$('kakao').value='';$('homePos').value=get('itsHome');$('work').value=get('itsWork');show()};
 $('go').onclick=function(){run('go')};
 $('back').onclick=function(){run('back')};
 $('resetKey2').onclick=function(){$('resetKey').onclick()};
@@ -175,6 +183,10 @@ document.querySelectorAll('.toHome').forEach(function(b){b.onclick=function(){vi
 $('mGo').onclick=function(){view('main');run('go')};
 $('mBack').onclick=function(){view('main');run('back')};
 $('mFood').onclick=function(){near('food',0)};
+var CM='near';
+$('mCafe').onclick=function(){CM='near';near('cafe',0)};
+$('tNear').onclick=function(){CM='near';near('cafe',NI)};
+$('tRate').onclick=function(){CM='rate';near('cafe',NI)};
 $('mStay').onclick=function(){near('stay',0)};
 $('mPark').onclick=function(){near('park',0)};
 $('mGas').onclick=gasOpen;
@@ -184,6 +196,7 @@ $('nMore').onclick=function(){if(NK==='tour')tour(NI+1);else near(NK,NI+1)};
 // 현재 위치 기준 주변 검색 (카카오 장소 검색)
 var NEAR={
   food:{t:'주변 맛집',u:'search/category.json?category_group_code=FD6',r:[500,1000,2000]},
+  cafe:{t:'주변 까페',r:[500,1000,2000]},
   stay:{t:'주변 숙소',u:'search/category.json?category_group_code=AD5',r:[2000,5000,10000]},
   park:{t:'주변 공영주차장',u:'search/keyword.json?query='+encodeURIComponent('공영주차장'),r:[500,1000,2000]},
   gas:{t:'주변 주유소',u:'search/category.json?category_group_code=OL7',r:[2000,5000,10000]}
@@ -307,15 +320,63 @@ async function near(k,i){
   view('near');
   $('nTitle').textContent=N.t+' · 반경 '+fmt(N.r[i]);
   $('nMore').hidden=i>=N.r.length-1;
+  $('cTabs').hidden=k!=='cafe';
+  $('tNear').className=CM==='near'?'on':'';$('tRate').className=CM==='rate'?'on':'';
   $('nOut').innerHTML='<div class="card muted">현재 위치 확인 중…</div>';
   var c=new AbortController();var t=setTimeout(function(){c.abort()},15000);
   try{
     var p=await here();
+    if(k==='cafe'&&CM==='rate'){
+      var gk=get('gKey');
+      if(!gk){$('nOut').innerHTML='<div class="card">추천순(별점)을 보려면 구글 지도 키가 필요합니다.<br><span class="m">처음으로 → 설정 변경 → 구글 지도 키 칸에 입력해 주세요.</span></div>';return}
+      var gr=await fetch('https://places.googleapis.com/v1/places:searchNearby',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.googleMapsUri'},body:JSON.stringify({includedTypes:['cafe'],maxResultCount:20,languageCode:'ko',locationRestriction:{circle:{center:{latitude:p[0],longitude:p[1]},radius:N.r[i]}}}),signal:c.signal});
+      var gj=await gr.json();
+      if(gj.error)throw new Error('구글 조회 실패: '+(gj.error.message||gj.error.status));
+      var gp=(gj.places||[]).filter(function(x){return x.rating});
+      var gm=gp.filter(function(x){return (x.userRatingCount||0)>=10});
+      if(gm.length>=3)gp=gm;
+      gp.forEach(function(x){x._d=x.location?hav(p[0],p[1],x.location.latitude,x.location.longitude)*1000:0});
+      gp.sort(function(a,b){return b.rating-a.rating||(b.userRatingCount||0)-(a.userRatingCount||0)});
+      if(!gp.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 별점이 있는 까페가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+      var rh='<div class="card">';
+      gp.slice(0,15).forEach(function(x){
+        var nm=(x.displayName&&x.displayName.text)||'';
+        rh+='<div class="it"><b>'+esc(nm)+'</b><span class="star">★ '+x.rating.toFixed(1)+'</span> <span class="m">(리뷰 '+num(x.userRatingCount||0)+'개) · '+fmt(Math.round(x._d))+'</span><br><span class="m">'+esc(x.formattedAddress||'')+'</span><br>'
+          +(x.location?'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.location.latitude+','+x.location.longitude+'">길안내</a>':'')
+          +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.googleMapsUri||'#')+'">구글 후기</a></div>';
+      });
+      $('nOut').innerHTML=rh+'</div><p class="muted">반경 안 인기 까페 최대 20곳 중 별점 높은 순 · 리뷰 10개 이상 우선 · 구글 지도 기준</p>';
+      return;
+    }
+    if(k==='cafe'){
+      var B2='https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRadius?serviceKey='+DEF.tour+'&numOfRows=100&radius='+N.r[i]+'&cx='+p[1]+'&cy='+p[0]+'&indsSclsCd=I21201&type=json';
+      var j1=await (await fetch(B2+'&pageNo=1',{signal:c.signal})).json();
+      if(!j1.body||(j1.header&&j1.header.resultCode!=='00'))throw new Error((j1.header&&j1.header.resultMsg)||'조회 실패');
+      var tot=parseInt(j1.body.totalCount,10)||0,all=[].concat(j1.body.items||[]);
+      var pg=Math.min(5,Math.ceil(tot/100)),rest=[];
+      for(var q=2;q<=pg;q++)rest.push(fetch(B2+'&pageNo='+q,{signal:c.signal}).then(function(r){return r.json()}).then(function(x){return (x.body&&x.body.items)||[]}));
+      (await Promise.all(rest)).forEach(function(a){all=all.concat(a)});
+      all.forEach(function(x){x._d=hav(p[0],p[1],x.lat,x.lon)*1000});
+      all.sort(function(a,b){return a._d-b._d});
+      if(!all.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 까페가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
+      var hc='<div class="card">';
+      all.slice(0,15).forEach(function(x){
+        var nm=x.bizesNm+(x.brchNm?' '+x.brchNm:'');
+        var loc=(x.bldNm?x.bldNm+' ':'')+(x.flrNo?x.flrNo+'층':'');
+        hc+='<div class="it"><b>'+esc(nm)+'</b><span class="m">'+fmt(Math.round(x._d))+(loc?' · '+esc(loc):'')+'</span><br><span class="m">'+esc(x.rdnmAdr||x.lnoAdr||'')+'</span><br>'
+          +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.lat+','+x.lon+'">길안내</a>'
+          +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/?q='+encodeURIComponent((x.signguNm||'')+' '+nm)+'">후기·상세</a></div>';
+      });
+      hc+='</div><p class="muted">반경 안 까페 '+tot+'곳 중 가까운 '+Math.min(15,all.length)+'곳 · 소상공인시장진흥공단 상가정보 기준(신규·폐업 반영이 늦을 수 있음)</p>';
+      $('nOut').innerHTML=hc;
+      return;
+    }
     var u='https://dapi.kakao.com/v2/local/'+N.u+'&x='+p[1]+'&y='+p[0]+'&radius='+N.r[i]+'&sort=distance&size=15';
     var r=await fetch(u,{headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)},signal:c.signal});
     var j=await r.json();
     if(!j.documents)throw new Error(j.message||'조회 실패');
     var d=j.documents;
+    if(k==='food'){d=d.filter(function(x){return (x.category_name||'').indexOf('카페')<0})}
     if(k==='park'){var g=d.filter(function(x){return x.place_name.indexOf('공영')>-1});if(g.length)d=g}
     if(!d.length){$('nOut').innerHTML='<div class="card muted">이 반경에는 결과가 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';return}
     var h='<div class="card">';
