@@ -494,11 +494,11 @@ async function run(which){
   var vp=verdict(which);
   try{
     var box='minX='+BOX.minX+'&maxX='+BOX.maxX+'&minY='+BOX.minY+'&maxY='+BOX.maxY;
-    var tf=false;
+    var tf=false,cerr='';
     var res=await Promise.all([
       call('eventInfo','type=all&eventType=all&'+box,key),
       call('trafficInfo','type=all&drcType=all&'+box,key,50000).catch(function(){tf=true;return []}),
-      call('cctvInfo','type=all&cctvType=1&'+box,key,15000).catch(function(){return []})
+      call('cctvInfo','type=all&cctvType=1&'+box,key,15000).catch(function(e){cerr=String(e&&e.message||e);return []})
     ]);
     var events=res[0], traffic=res[1], cams=(res[2]||[]).map(function(c){return {n:c.cctvname||c.cctvName||'',u:c.cctvurl||c.cctvUrl||'',x:parseFloat(c.coordx||c.coordX),y:parseFloat(c.coordy||c.coordY)}}).filter(function(c){return c.u&&!isNaN(c.x)&&!isNaN(c.y)});
 
@@ -542,7 +542,7 @@ async function run(which){
       h+='<div class="ev"><b>'+esc(e.eventType)+' · '+esc(e.roadName)+' '+esc(e.roadDrcType||'')+'</b>'+esc(e.message||e.eventDetailType||'')+(e.lanesBlocked?'<br><span>'+esc(e.lanesBlocked)+'</span>':'')+'<br><span>'+hhmm(e.startDate)+' 발생</span>'+camLink(e,cams)+'</div>';
     });
     h+='</div>';
-    h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건</p>';
+    h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건<br>CCTV '+(cerr?'조회 실패: '+esc(cerr):cams.length+'곳 조회됨')+'</p>';
     out.innerHTML=h;
     drawMap(events,mine);
   }catch(err){
