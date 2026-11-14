@@ -68,7 +68,7 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
   <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
   <label for="kakao">카카오 REST API 키 (우회 판단용)</label>
   <input id="kakao" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="카카오 REST API 키 32자리">
-  <label for="gkey">구글 지도 키 (까페 추천순용)</label>
+  <label for="gkey">구글 지도 키 (까페·맛집 추천순용)</label>
   <input id="gkey" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="비워 두면 기존 값 유지">
   <label for="homePos">집 위치</label>
   <input id="homePos" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="구글지도 플러스 코드 또는 좌표">
@@ -328,7 +328,11 @@ async function near(k,i){
     var p=await here();
     if((k==='cafe'||k==='food')&&CM==='rate'){var LB=k==='cafe'?'까페':'맛집';
       var gk=get('gKey');
-      if(!gk){$('nOut').innerHTML='<div class="card">추천순(별점)을 보려면 구글 지도 키가 필요합니다.<br><span class="m">처음으로 → 설정 변경 → 구글 지도 키 칸에 입력해 주세요.</span></div>';return}
+      if(!gk){$('nOut').innerHTML='<div class="card">추천순(별점)을 보려면 구글 지도 키가 필요합니다.<br><span class="m">아래 칸에 키를 붙여 넣고 저장하면 바로 조회합니다. (이 폰에만 저장됩니다)</span>'
+        +'<input id="gkInline" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="구글 지도 키 붙여넣기" style="margin-top:10px">'
+        +'<button id="gkSave" style="width:100%;margin-top:8px">저장하고 조회</button></div>';
+        $('gkSave').onclick=function(){var v=$('gkInline').value.trim();if(v.length<20){$('gkInline').placeholder='키를 다시 확인해 주세요';$('gkInline').value='';return}put('gKey',v);near(NK,NI)};
+        return}
       var gr=await fetch('https://places.googleapis.com/v1/places:searchNearby',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.googleMapsUri'},body:JSON.stringify({includedTypes:k==='cafe'?['cafe']:['restaurant'],excludedTypes:k==='cafe'?[]:['cafe','coffee_shop'],maxResultCount:20,languageCode:'ko',locationRestriction:{circle:{center:{latitude:p[0],longitude:p[1]},radius:N.r[i]}}}),signal:c.signal});
       var gj=await gr.json();
       if(gj.error)throw new Error('구글 조회 실패: '+(gj.error.message||gj.error.status));
