@@ -477,6 +477,20 @@ function drawMap(events,mine){
   });
 }
 
+function myCams(R,cams){
+  var toks=[];R.roads.forEach(function(r){(r.ev||[]).concat(r.tr||[]).forEach(function(t){if(toks.indexOf(t)<0)toks.push(t)})});
+  var out='';
+  R.roads.forEach(function(r){
+    var ts=(r.ev||[]).concat(r.tr||[]);
+    var l=cams.filter(function(c){return ts.some(function(t){return c.n.indexOf(t)>=0})});
+    if(!l.length)return;
+    out+='<div class="ev"><b>'+esc(r.n)+' CCTV '+l.length+'곳</b>';
+    l.slice(0,8).forEach(function(c){out+='<br><a class="lk" target="_blank" rel="noopener" href="'+esc(c.u)+'">'+esc(c.n)+'</a>'});
+    if(l.length>8)out+='<br><span>외 '+(l.length-8)+'곳</span>';
+    out+='</div>';
+  });
+  return '<div class="card"><h2>내 도로 CCTV</h2>'+(out||'<span class="muted">내 도로 이름과 일치하는 CCTV를 찾지 못했습니다'+(cams.length?' (구간 전체 '+cams.length+'곳)':'')+'</span>')+'</div>';
+}
 function camLink(e,cams){
   var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
   if(isNaN(x)||isNaN(y)||!cams.length)return '';
@@ -537,6 +551,7 @@ async function run(which){
 
     h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">'+(tf?'소통 자료를 불러오지 못했습니다. 다시 눌러 보세요.':'소통 자료가 없습니다')+'</span>')+(none.length&&!tf?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
 
+    h+=myCams(R,cams);
     h+='<div class="card"><h2>사고·공사</h2>';
     if(!mine.length){h+='<span class="muted">해당 없음</span>'}
     else mine.slice(0,15).forEach(function(e){
