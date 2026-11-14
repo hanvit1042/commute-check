@@ -448,17 +448,20 @@ async function verdict(which){
   }finally{clearTimeout(t)}
 }
 
-var MYCAMS=[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리']],['송내대로 부천체육관사거리',['부천체육관']]];
-function myCams(cams){
+var MYCAMS={
+  go:[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리']],['송내대로 부천체육관사거리',['부천체육관']]],
+  back:[['남부순환로 화곡입구',['화곡입구']],['경인고속도로 신월2',['신월2']],['수도권제1순환고속도로 삼산1',['삼산1']],['무네미로 수현삼거리',['수현삼거리']],['무네미로 장수사거리',['장수사거리']]]
+};
+function myCams(which,cams){
   var out='',miss=[];
-  MYCAMS.forEach(function(m){
+  MYCAMS[which].forEach(function(m){
     var c=null;
     cams.some(function(x){if(m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
     if(c)out+='<div class="ev"><a class="lk" target="_blank" rel="noopener" href="'+esc(c.u)+'" style="font-size:18px"><b>'+esc(m[0])+'</b> 실시간 보기</a></div>';
     else miss.push(m[0]);
   });
   if(miss.length)out+='<p class="muted" style="margin:10px 0 0">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
-  return '<div class="card"><h2>내 출근길 CCTV</h2>'+out+'</div>';
+  return '<div class="card"><h2>내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2>'+out+'</div>';
 }
 function camLink(e,cams){
   var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
@@ -516,7 +519,7 @@ async function run(which){
     if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
     var h=await vp;
     h+='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
-    h+=myCams(cams);
+    h+=myCams(which,cams);
 
     h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">'+(tf?'소통 자료를 불러오지 못했습니다. 다시 눌러 보세요.':'소통 자료가 없습니다')+'</span>')+(none.length&&!tf?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
 
