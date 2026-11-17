@@ -456,19 +456,22 @@ async function verdict(which){
 }
 
 var MYCAMS={
-  go:[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리']],['송내대로 부천체육관사거리',['부천체육관']]],
-  back:[['남부순환로 화곡입구',['화곡입구']],['경인고속도로 신월2',['신월2']],['수도권제1순환고속도로 삼산1',['삼산1']],['무네미로 수현삼거리',['수현삼거리']],['무네미로 장수사거리',['장수사거리']],['제2경인고속도로 장수천1교',['장수천1교']]]
+  go:[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리'],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L020127&cctvname=%25EC%2588%2598%25ED%2598%2584%25EC%2582%25BC%25EA%25B1%25B0%25EB%25A6%25AC&kind=N&cctvip=0&cctvch=undefined&id=L1012&cctvpasswd=undefined&cctvport=undefined&minX=126.71167891467982&minY=37.43755327326039&maxX=126.77406288438138&maxY=37.47830159409096',x:126.7429,y:37.4579}],['남동공단입구사거리',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L020029&cctvname=%25EB%2582%25A8%25EB%258F%2599%25EA%25B3%25B5%25EB%258B%25A8%25EC%259E%2585%25EA%25B5%25AC%25EC%2582%25AC%25EA%25B1%25B0%25EB%25A6%25AC&kind=N&cctvip=0&cctvch=undefined&id=L1001&cctvpasswd=undefined&cctvport=undefined&minX=126.67386669458055&minY=37.400875418761295&maxX=126.73620961830295&maxY=37.441640527045344',x:126.7050,y:37.4213}],['송내대로 삼정고가교',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L030017&cctvname=%25EC%2582%25BC%25EC%25A0%2595%25EA%25B3%25A0%25EA%25B0%2580%25EA%25B5%2590&kind=O&cctvip=TM006TC06P&cctvch=6&id=undefined&cctvpasswd=undefined&cctvport=undefined&minX=126.73223204459947&minY=37.4994999813395&maxX=126.79466763298922&maxY=37.54023903470546',x:126.7634,y:37.5199}],['송내대로 부천체육관사거리',['부천체육관']],['남부순환로 화곡입구',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L010333&cctvname=%25ED%2599%2594%25EA%25B3%25A1%25EC%259E%2585%25EA%25B5%25AC&kind=Seoul&cctvip=undefined&cctvch=51&id=91&cctvpasswd=undefined&cctvport=undefined&minX=126.79255715417293&minY=37.51220577987835&maxX=126.85502647959387&maxY=37.55291806784665',x:126.8238,y:37.5326}]],
+  back:[['남부순환로 화곡역',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L010332&cctvname=%25ED%2599%2594%25EA%25B3%25A1%25EC%2597%25AD&kind=Seoul&cctvip=undefined&cctvch=51&id=101&cctvpasswd=undefined&cctvport=undefined&minX=126.80565462613714&minY=37.521669997919666&maxX=126.86813596267825&maxY=37.562376443238286',x:126.8369,y:37.5420}],['남부순환로 화곡입구',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L010333&cctvname=%25ED%2599%2594%25EA%25B3%25A1%25EC%259E%2585%25EA%25B5%25AC&kind=Seoul&cctvip=undefined&cctvch=51&id=91&cctvpasswd=undefined&cctvport=undefined&minX=126.79255715417293&minY=37.51220577987835&maxX=126.85502647959387&maxY=37.55291806784665',x:126.8238,y:37.5326}],['남부순환로 신월IC',[],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L010180&cctvname=%25EC%258B%25A0%25EC%259B%2594IC&kind=Seoul&cctvip=undefined&cctvch=51&id=92&cctvpasswd=undefined&cctvport=undefined&minX=126.79398143179671&minY=37.50413522858668&maxX=126.85644570289274&maxY=37.54484691417056',x:126.8252,y:37.5245}],['경인고속도로 신월2',['신월2']],['수도권제1순환고속도로 삼산1',['삼산1']],['무네미로 수현삼거리',['수현삼거리'],{u:'https://www.utic.go.kr/jsp/map/cctvStream.jsp?cctvid=L020127&cctvname=%25EC%2588%2598%25ED%2598%2584%25EC%2582%25BC%25EA%25B1%25B0%25EB%25A6%25AC&kind=N&cctvip=0&cctvch=undefined&id=L1012&cctvpasswd=undefined&cctvport=undefined&minX=126.71167891467982&minY=37.43755327326039&maxX=126.77406288438138&maxY=37.47830159409096',x:126.7429,y:37.4579}],['무네미로 장수사거리',['장수사거리']],['제2경인고속도로 장수천1교',['장수천1교']]]
 };
 var MAP=null,CF=[];
 function myCams(which,cams){
   var out='',miss=[];CF=[];
   MYCAMS[which].forEach(function(m){
     var c=null;
-    cams.some(function(x){if(m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
+    if(m[2])c={n:m[0],u:m[2].u,x:m[2].x,y:m[2].y,ap:1,fx:1};
+    else cams.some(function(x){if(m[1].length&&m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
     if(c){CF.push({n:m[0],c:c});var k=CF.length;out+='<a class="cr" target="_blank" rel="noopener" href="'+esc(c.u)+'"><span class="cn">'+k+'</span><span>'+esc(m[0])+'</span><span class="go">영상 ›</span></a>'}
     else miss.push(m[0]);
   });
+  var ut=CF.some(function(f){return f.c.fx});
   if(miss.length)out+='<p class="muted" style="margin:0;padding:10px 0;border-top:1px solid var(--line)">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
+  if(ut)out+='<p class="muted" style="margin:0;padding:10px 0;border-top:1px solid var(--line);font-size:13px">시내 도로 CCTV는 경찰청 도시교통정보센터(UTIC) 제공 교통정보입니다. 지도 위치는 대략적입니다.</p>';
   return '<h2 style="margin:20px 2px 0;font-size:18px">내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2><div id="map"></div><div class="card" style="padding:4px 16px">'+out+'</div>';
 }
 function drawCamMap(){
