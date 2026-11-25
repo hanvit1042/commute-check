@@ -255,7 +255,7 @@ async function gasRun(){
       }
       sel.sort(function(a,b){return a.s.p-b.s.p||a.d-b.d});
       h+='<div class="card"><h2>싼 곳 5개</h2>';
-      sel.slice(0,5).forEach(function(x){h+='<div class="it"><b>'+esc(x.s.n)+' · '+num(x.s.p)+'원</b><span class="m">'+esc(BR[x.s.b]||'')+' · '+x.d.toFixed(1)+'km</span><br><a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.s.n)+','+x.s.y+','+x.s.x+'">길안내</a></div>'});
+      sel.slice(0,5).forEach(function(x){h+='<div class="it"><b>'+esc(x.s.n)+' · '+num(x.s.p)+'원</b><span class="m">'+esc(BR[x.s.b]||'')+' · '+x.d.toFixed(1)+'km</span><br>'+nav(x.s.n,x.s.y,x.s.x)+'</div>'});
       h+='</div>';
     }else{
       h+='<div class="card muted">'+(inside?'이 반경에서 가격 자료를 찾지 못했습니다.':'이 지역은 주유소별 가격이 없습니다(수도권만 제공). 시·도 평균으로 비교합니다.')+'</div>';
@@ -292,7 +292,7 @@ async function tour(i){
       h+='<div class="it"><b>'+esc(x.title)+'</b><span class="m">'+fmt(Math.round(parseFloat(x.dist)||0))+' · '+esc(x.addr1||'')+'</span><br>'
         +(x.firstimage?'<img src="'+esc(x.firstimage.replace(/^http:/,'https:'))+'" alt="" loading="lazy" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px">':'')
         +'<br><button class="ghost" data-id="'+esc(x.contentid)+'" data-n="'+n+'" style="margin-top:8px">이야기 보기</button> '
-        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.title)+','+x.mapy+','+x.mapx+'">길안내</a>'
+        +''+nav(x.title,x.mapy,x.mapx)+''
         +'<div class="muted" id="st'+n+'" style="white-space:pre-line;margin-top:8px" hidden></div></div>';
     });
     $('nOut').innerHTML=h+'</div>';
@@ -315,6 +315,11 @@ async function tour(i){
 }
 var G_MAX=950;
 function gUse(){var m=new Date().toISOString().slice(0,7),o={};try{o=JSON.parse(get('gCnt')||'{}')}catch(e){}return o.m===m?{m:m,n:o.n||0}:{m:m,n:0}}
+function nav(nm,la,lo){
+  var e=encodeURIComponent(nm);
+  return '<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+e+','+la+','+lo+'">카카오 길안내</a>'
+    +'<a class="lk" target="_blank" rel="noopener" href="https://map.naver.com/p/directions/-/'+lo+','+la+','+e+'/-/car">네이버 길안내</a>';
+}
 function fmt(m){return m>=1000?(m/1000)+'km':m+'m'}
 function here(){return new Promise(function(ok,no){
   if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
@@ -354,7 +359,7 @@ async function near(k,i){
       gp.slice(0,15).forEach(function(x){
         var nm=(x.displayName&&x.displayName.text)||'';
         rh+='<div class="it"><b>'+esc(nm)+'</b><span class="star">★ '+x.rating.toFixed(1)+'</span> <span class="m">(리뷰 '+num(x.userRatingCount||0)+'개) · '+fmt(Math.round(x._d))+'</span><br><span class="m">'+esc(x.formattedAddress||'')+'</span><br>'
-          +(x.location?'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.location.latitude+','+x.location.longitude+'">길안내</a>':'')
+          +(x.location?''+nav(nm,x.location.latitude,x.location.longitude)+'':'')
           +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.googleMapsUri||'#')+'">구글 후기</a></div>';
       });
       var left=G_MAX-gu.n;
@@ -377,7 +382,7 @@ async function near(k,i){
         var nm=x.bizesNm+(x.brchNm?' '+x.brchNm:'');
         var loc=(x.bldNm?x.bldNm+' ':'')+(x.flrNo?x.flrNo+'층':'');
         hc+='<div class="it"><b>'+esc(nm)+'</b><span class="m">'+fmt(Math.round(x._d))+(loc?' · '+esc(loc):'')+'</span><br><span class="m">'+esc(x.rdnmAdr||x.lnoAdr||'')+'</span><br>'
-          +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(nm)+','+x.lat+','+x.lon+'">길안내</a>'
+          +''+nav(nm,x.lat,x.lon)+''
           +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/?q='+encodeURIComponent((x.signguNm||'')+' '+nm)+'">후기·상세</a></div>';
       });
       hc+='</div><p class="muted">반경 안 까페 '+tot+'곳 중 가까운 '+Math.min(15,all.length)+'곳 · 소상공인시장진흥공단 상가정보 기준(신규·폐업 반영이 늦을 수 있음)</p>';
@@ -396,7 +401,7 @@ async function near(k,i){
     d.forEach(function(x){
       var cat=(x.category_name||'').split(' > ').slice(1).join(' · ');
       h+='<div class="it"><b>'+esc(x.place_name)+'</b><span class="m">'+fmt(parseInt(x.distance,10)||0)+(cat?' · '+esc(cat):'')+'</span><br><span class="m">'+esc(x.road_address_name||x.address_name||'')+(x.phone?' · '+esc(x.phone):'')+'</span><br>'
-        +'<a class="lk" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/'+encodeURIComponent(x.place_name)+','+x.y+','+x.x+'">길안내</a>'
+        +''+nav(x.place_name,x.y,x.x)+''
         +'<a class="lk" target="_blank" rel="noopener" href="'+esc(x.place_url||'#')+'">후기·상세</a>'
         +(k==='gas'?'<a class="lk" target="_blank" rel="noopener" href="https://www.opinet.co.kr/searRgSelect.do">가격 보기(오피넷)</a>':'')+'</div>';
     });
