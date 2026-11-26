@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f3a5f">
 <title>원클릭 비서</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--fg:#17212b;--sub:#5b6773;--line:#dde3ea;--main:#1f3a5f;--onmain:#fff;--ok:#1e7e46;--okbg:#e4f4ea;--warn:#a65f00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161d;--card:#18212b;--fg:#eaf0f6;--sub:#9aa7b4;--line:#2a3643;--main:#5d8fcf;--onmain:#0b1219;--ok:#6fd195;--okbg:#14301f;--warn:#f0b24c;--warnbg:#33260d;--bad:#ff8d85;--badbg:#3a1613}}
@@ -35,8 +34,6 @@ h2{font-size:18px;margin:0 0 8px}
 input{font:inherit;width:100%;min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;margin:8px 0 12px}
 label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .pin{display:inline-block;background:var(--main);color:var(--onmain);border:2px solid #fff;border-radius:999px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-#map{height:50vh;min-height:280px;border-radius:14px;border:1px solid var(--line);margin-top:10px;z-index:0}
-.cn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--main);color:var(--onmain);font-weight:600;font-size:13px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);flex:none}
 .cr{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);text-decoration:none;color:var(--fg);font-size:16px}
 .cr:first-of-type{border-top:0}
 .cr span.go{margin-left:auto;color:var(--main);font-size:14px;white-space:nowrap}
@@ -58,7 +55,6 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .star{color:#c77700;font-weight:700}
 [hidden]{display:none!important}
 </style>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 </head>
 <body>
 <main>
@@ -70,7 +66,7 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
   <p class="muted">입력한 내용은 이 폰에만 저장됩니다.</p>
   <label for="key">ITS 인증키</label>
   <input id="key" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인증키 32자리">
-  <label for="kakao">카카오 REST API 키 (우회 판단용)</label>
+  <label for="kakao">카카오 REST API 키</label>
   <input id="kakao" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="카카오 REST API 키 32자리">
   <label for="gkey">구글 지도 키 (까페·맛집 추천순용)</label>
   <input id="gkey" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="비워 두면 기존 값 유지">
@@ -424,79 +420,22 @@ async function call(path, params, key, ms){
 }
 
 
-// 카카오 길찾기: 지금 교통 기준 예상 시간으로 평소 길 vs 우회 길 비교
-var USUAL = {go:'sn', back:'gi'};
-var KIND = {sn:'송내대로 경유', gi:'경인·제1순환 경유'};
-async function verdict(which){
-  var kk=get('kakaoKey')||DEF.kakao, H=parsePos(get('itsHome')), W=parsePos(get('itsWork'));
-  if(!kk||!H||!W)return '<div class="card muted">우회 판단을 쓰려면 아래 "설정 변경"에서 카카오 키와 집·회사 위치를 입력해 주세요.</div>';
-  var o=which==='go'?H:W, d=which==='go'?W:H;
-  var u='https://apis-navi.kakaomobility.com/v1/directions?origin='+o[1]+','+o[0]+'&destination='+d[1]+','+d[0]+'&priority=RECOMMEND&alternatives=true&road_details=false';
-  var c=new AbortController();var t=setTimeout(function(){c.abort()},15000);
-  try{
-    var r=await fetch(u,{headers:{Authorization:'KakaoAK '+kk},signal:c.signal});
-    var j=await r.json();
-    if(!j.routes||!j.routes.length)throw new Error(j.msg||'경로 없음');
-    var best={};
-    j.routes.forEach(function(rt){
-      if(!rt.summary)return;
-      var m={};(rt.sections||[]).forEach(function(s){(s.roads||[]).forEach(function(x){m[x.name]=(m[x.name]||0)+x.distance})});
-      var kind='x';
-      if((m['송내대로']||0)>2000)kind='sn';
-      else if((m['경인고속도로']||0)+(m['수도권제1순환고속도로']||0)>3000)kind='gi';
-      var min=Math.round(rt.summary.duration/60);
-      if(!best[kind]||min<best[kind])best[kind]=min;
-    });
-    var us=USUAL[which], al=us==='sn'?'gi':'sn';
-    if(best[us]==null||best[al]==null){
-      var f=Math.min.apply(null,Object.keys(best).map(function(k){return best[k]}));
-      return '<div class="banner b-ok">지금 예상 '+f+'분<small>평소 길과 우회 길을 구분하지 못했습니다. 아래 사고·공사를 참고하세요.</small></div>';
-    }
-    var diff=best[us]-best[al];
-    if(diff>=5)return '<div class="banner b-bad">'+KIND[al]+'으로 가세요<small>평소 길 '+best[us]+'분 → 우회 '+best[al]+'분 · <b>'+diff+'분 빠름</b></small></div>';
-    return '<div class="banner b-ok">평소 길로 가세요<small>'+KIND[us]+' '+best[us]+'분 · 우회 '+KIND[al]+' '+best[al]+'분</small></div>';
-  }catch(e){
-    return '<div class="card muted">우회 판단을 불러오지 못했습니다. 카카오 키를 확인해 주세요.</div>';
-  }finally{clearTimeout(t)}
-}
 
 var MYCAMS={
   go:[['제2경인고속도로 장수천1교',['장수천1교']],['영동고속도로 서창JC',['서창JC','서창분기점']],['무네미로 장승백이사거리',['장승백이']],['무네미로 수현삼거리',['수현삼거리']],['송내대로 부천체육관사거리',['부천체육관']]],
   back:[['남부순환로 화곡입구',['화곡입구']],['경인고속도로 신월2',['신월2']],['수도권제1순환고속도로 삼산1',['삼산1']],['무네미로 수현삼거리',['수현삼거리']],['무네미로 장수사거리',['장수사거리']],['제2경인고속도로 장수천1교',['장수천1교']]]
 };
-var MAP=null,CF=[];
+var CF=[];
 function myCams(which,cams){
   var out='',miss=[];CF=[];
   MYCAMS[which].forEach(function(m){
     var c=null;
     cams.some(function(x){if(m[1].some(function(t){return x.n.indexOf(t)>=0})){c=x;return true}});
-    if(c){CF.push({n:m[0],c:c});var k=CF.length;out+='<a class="cr" target="_blank" rel="noopener" href="'+esc(c.u)+'"><span class="cn">'+k+'</span><span>'+esc(m[0])+'</span><span class="go">'+'영상 ›'+'</span></a>'}
+    if(c){CF.push({n:m[0],c:c});out+='<a class="cr" target="_blank" rel="noopener" href="'+esc(c.u)+'"><span>'+esc(m[0])+'</span><span class="go">'+'영상 ›'+'</span></a>'}
     else miss.push(m[0]);
   });
   if(miss.length)out+='<p class="muted" style="margin:0;padding:10px 0;border-top:1px solid var(--line)">ITS에서 찾지 못한 곳: '+esc(miss.join(', '))+'</p>';
-  return '<h2 style="margin:20px 2px 0;font-size:18px">내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2><div id="map"></div><div class="card" style="padding:4px 16px">'+out+'</div>';
-}
-function drawCamMap(){
-  var box=$('map');
-  if(!box)return;
-  if(typeof L==='undefined'){box.outerHTML='<div class="card muted">지도를 불러오지 못했습니다. 아래 목록을 누르세요.</div>';return}
-  if(MAP){MAP.remove();MAP=null}
-  MAP=L.map('map');
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(MAP);
-  var pts=[];
-  [['집','itsHome'],['회사','itsWork']].forEach(function(p){
-    var pos=parsePos(get(p[1]));
-    if(!pos)return;
-    pts.push(pos);
-    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="pin">'+p[0]+'</div>',iconSize:null,iconAnchor:[18,12]}),zIndexOffset:500}).addTo(MAP);
-  });
-  CF.forEach(function(f,i){
-    var pos=[f.c.y,f.c.x];pts.push(pos);
-    L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="cn">'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:1000})
-      .bindPopup('<b>'+(i+1)+'. '+esc(f.n)+'</b><br><a href="'+esc(f.c.u)+'" target="_blank" rel="noopener" style="font-size:17px;font-weight:700">'+'실시간 영상 보기'+'</a>')
-      .addTo(MAP);
-  });
-  if(pts.length)MAP.fitBounds(pts,{padding:[30,30],maxZoom:15});else MAP.setView([37.5,126.75],11);
+  return '<h2 style="margin:20px 2px 0;font-size:18px">내 '+(which==='go'?'출근':'퇴근')+'길 CCTV</h2><div class="card" style="padding:4px 16px">'+out+'</div>';
 }
 function camLink(e,cams){
   var x=parseFloat(e.coordX),y=parseFloat(e.coordY);
@@ -513,7 +452,6 @@ async function run(which){
   var key=load(), R=ROUTES[which], out=$('out');
   $('go').disabled=$('back').disabled=true;
   out.innerHTML='<div class="card muted">조회 중입니다…</div>';
-  var vp=verdict(which);
   try{
     var box='minX='+BOX.minX+'&maxX='+BOX.maxX+'&minY='+BOX.minY+'&maxY='+BOX.maxY;
     var tf=false,cerr='';
@@ -546,17 +484,10 @@ async function run(which){
       rows.push('<div class="row"><span>'+esc(r.n)+(r.part?' <span class="muted">(일부 구간)</span>':'')+'<br><span class="muted">평균 '+avg.toFixed(0)+'km/h</span></span><span class="chip '+st[1]+'">'+st[0]+'</span></div>');
     });
 
-    var level=(acc.length||worst===2)?2:(mine.length||worst===1)?1:0;
-    var cls=['b-ok','b-warn','b-bad'][level];
-    var title=['이상 없음','주의가 필요합니다','우회를 검토하세요'][level];
-    var line=acc.length?('교통사고 '+acc.length+'건'):'';
-    if(mine.length-acc.length>0){line+=(line?' · ':'')+'공사·기타 '+(mine.length-acc.length)+'건'}
-    if(!line)line='내 도로에서 확인된 사고·공사가 없습니다';
-    var h=await vp;
-    h+='<div class="banner '+cls+'">'+title+'<small>'+esc(R.name)+' · '+line+'</small></div>';
-    h+=myCams(which,cams);
-
+    var h='';
+    h+='<h2 style="margin:4px 2px 0;font-size:20px">'+esc(R.name)+'</h2>';
     h+='<div class="card"><h2>도로 소통</h2>'+(rows.join('')||'<span class="muted">'+(tf?'소통 자료를 불러오지 못했습니다. 다시 눌러 보세요.':'소통 자료가 없습니다')+'</span>')+(none.length&&!tf?'<p class="muted" style="margin:10px 0 0">자료 없음: '+esc(none.join(', '))+'</p>':'')+'</div>';
+    h+=myCams(which,cams);
 
     h+='<div class="card"><h2>사고·공사</h2>';
     if(!mine.length){h+='<span class="muted">해당 없음</span>'}
@@ -566,10 +497,9 @@ async function run(which){
     h+='</div>';
     h+='<p class="muted">기준 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' · 구간 전체 사고·공사 '+events.length+'건 중 내 도로 '+mine.length+'건<br>CCTV '+(cerr?'조회 실패: '+esc(cerr):cams.length+'곳 조회됨')+'</p>';
     out.innerHTML=h;
-    drawCamMap();
   }catch(err){
     var m=String(err&&err.message||err);
-    out.innerHTML=(await vp)+'<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "설정 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
+    out.innerHTML='<div class="banner b-bad">조회하지 못했습니다<small>'+esc(/4005|인증/.test(m)?'인증키를 확인해 주세요. 아래 "설정 변경"에서 다시 입력할 수 있습니다.':'잠시 후 다시 눌러 주세요. ('+m+')')+'</small></div>';
   }finally{$('go').disabled=$('back').disabled=false}
 }
 (function(){if(get('posVer')!=='1'){put('itsHome',DEF.home);put('itsWork',DEF.work);put('posVer','1')}})();
