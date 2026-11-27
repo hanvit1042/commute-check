@@ -51,6 +51,8 @@ label{display:block;font-weight:700;font-size:15px;margin-top:8px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .tabs button{min-height:48px;background:var(--card);color:var(--main);border:1px solid var(--line);font-size:16px}
+.tabs.t4{grid-template-columns:repeat(4,1fr)}
+.tabs.t4 button{padding:0;font-size:15px}
 .tabs button.on{background:var(--main);color:var(--onmain);border-color:var(--main)}
 .star{color:#c77700;font-weight:700}
 [hidden]{display:none!important}
@@ -321,6 +323,53 @@ function here(){return new Promise(function(ok,no){
   if(!navigator.geolocation)return no(new Error('이 브라우저는 위치 기능을 쓸 수 없습니다'));
   navigator.geolocation.getCurrentPosition(function(p){ok([p.coords.latitude,p.coords.longitude])},function(){no(new Error('위치 권한을 허용해 주세요'))},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 })}
+// 공영주차장: parking.json(전국주차장정보 표준데이터 가공본)으로 요금 계산. 내 차: 저공해 3종 50% 할인
+var PKD=null,PM=60,PS='d';
+async function parkData(){
+  if(PKD!==null)return PKD||null;
+  try{var r=await fetch('parking.json',{cache:'no-store'});if(!r.ok)throw 0;PKD=await r.json()}catch(e){PKD=false}
+  return PKD||null;
+}
+function pFee(x,m){
+  // x: [name,lat,lon,free,bt,bc,at,ac,dc,addr,phone,oper,cnt]
+  if(x[3])return 0;
+  var bt=x[4],bc=x[5],at=x[6],ac=x[7],dc=x[8],f;
+  if(!bc&&!ac&&!dc)return null;
+  if(bt>0){f=bc;if(m>bt&&at>0)f+=Math.ceil((m-bt)/at)*ac}
+  else if(at>0)f=Math.ceil(m/at)*ac;
+  else f=bc;
+  if(dc>0&&f>dc)f=dc;
+  return f;
+}
+function pHalf(f){return Math.ceil(f/2/10)*10}
+function renderPark(p,i,pk){
+  var rad=NEAR.park.r[i];
+  var L=pk.p.map(function(x){return {x:x,d:hav(p[0],p[1],x[1],x[2])*1000}}).filter(function(o){return o.d<=rad});
+  L.forEach(function(o){o.f=pFee(o.x,PM)});
+  if(PS==='p')L.sort(function(a,b){return (a.f==null?1e9:a.f)-(b.f==null?1e9:b.f)||a.d-b.d});
+  else L.sort(function(a,b){return a.d-b.d});
+  var mn=[[30,'30분'],[60,'1시간'],[120,'2시간'],[180,'3시간']];
+  var h='<div class="tabs t4">'+mn.map(function(a){return '<button data-m="'+a[0]+'" class="'+(PM===a[0]?'on':'')+'">'+a[1]+'</button>'}).join('')+'</div>'
+    +'<div class="tabs"><button data-s="d" class="'+(PS==='d'?'on':'')+'">가까운 순</button><button data-s="p" class="'+(PS==='p'?'on':'')+'">요금 낮은 순</button></div>';
+  if(!L.length)h+='<div class="card muted">이 반경에는 등록된 공영주차장이 없습니다. 아래 "범위 넓히기"를 눌러 보세요.</div>';
+  else{
+    h+='<div class="card">';
+    L.slice(0,12).forEach(function(o){
+      var x=o.x,f=o.f,mt=mn.filter(function(a){return a[0]===PM})[0][1],line;
+      if(x[3])line='<span class="star">무료</span>';
+      else if(f==null)line='<span class="m">요금 정보 없음</span>';
+      else line='<span class="star">내 차 '+mt+' '+num(pHalf(f))+'원</span> <span class="m">(할인 전 '+num(f)+'원)</span>';
+      var rule=x[3]?'':(x[5]||x[7]?(x[4]?x[4]+'분 '+num(x[5])+'원':'')+(x[6]?' · 추가 '+x[6]+'분 '+num(x[7])+'원':'')+(x[8]?' · 1일 '+num(x[8])+'원':''):'');
+      h+='<div class="it"><b>'+esc(x[0])+'</b><span class="m"> '+fmt(Math.round(o.d))+(x[12]?' · '+x[12]+'면':'')+'</span><br>'+line+(rule?'<br><span class="m">'+esc(rule)+'</span>':'')
+        +'<br><span class="m">'+esc(x[9]||'')+(x[11]?' · '+esc(x[11]):'')+(x[10]?' · '+esc(x[10]):'')+'</span><br>'+nav(x[0],x[1],x[2])+'</div>';
+    });
+    h+='</div>';
+  }
+  h+='<p class="muted">저공해 3종 50% 할인을 적용한 예상 금액입니다. 주차장마다 할인 여부·방식이 다를 수 있어 현장 안내를 확인하세요. 전국주차장정보 표준데이터 기준'+(pk.d?' ('+esc(pk.d)+')':'')+'입니다.</p>';
+  $('nOut').innerHTML=h;
+  $('nOut').querySelectorAll('button[data-m]').forEach(function(b){b.onclick=function(){PM=parseInt(b.getAttribute('data-m'),10);renderPark(p,i,pk)}});
+  $('nOut').querySelectorAll('button[data-s]').forEach(function(b){b.onclick=function(){PS=b.getAttribute('data-s');renderPark(p,i,pk)}});
+}
 async function near(k,i){
   var N=NEAR[k];NK=k;NI=i;
   view('near');
@@ -385,6 +434,7 @@ async function near(k,i){
       $('nOut').innerHTML=hc;
       return;
     }
+    if(k==='park'){var pk=await parkData();if(pk&&pk.p&&pk.p.length){renderPark(p,i,pk);return}}
     var u='https://dapi.kakao.com/v2/local/'+N.u+'&x='+p[1]+'&y='+p[0]+'&radius='+N.r[i]+'&sort=distance&size=15';
     var r=await fetch(u,{headers:{Authorization:'KakaoAK '+(get('kakaoKey')||DEF.kakao)},signal:c.signal});
     var j=await r.json();
